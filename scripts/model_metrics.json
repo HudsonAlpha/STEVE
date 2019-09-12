@@ -1,0 +1,40 @@
+{
+    "defined" : {
+        "dragen-07.011.352.3.2.8b" : {
+            "CALL" : [
+                "AD0", "AD1", "ADO", "AF0", "AF1", "AFO", "GT", "DP", "GQ"
+            ],
+            "INFO" : [
+                "DB", "FractionInformativeReads", "FS", "MQ", "MQRankSum", "QD", "R2_5P_bias", "ReadPosRankSum", "SOR"
+            ],
+            "MUNGED" : [
+                "DP_DP", "QUAL", "NEARBY", "FILTER"
+            ]
+        },
+        "dragen_batch" : {
+            "CALL" : [
+                "AD0", "AD1", "ADO", "AF0", "AF1", "AFO", "GT", "DP", "GQ"
+            ],
+            "INFO" : [
+                "DB", "FractionInformativeReads", "FS", "MQ", "MQRankSum", "QD", "R2_5P_bias", "ReadPosRankSum", "SOR"
+            ],
+            "MUNGED" : [
+                "DP_DP", "QUAL", "NEARBY", "FILTER"
+            ]
+        },
+        "strelka-2.9.10" : {
+            "CALL" : [
+                "AD0", "AD1", "ADO", "AF0", "AF1", "AFO", "GT", "DP", "DPI", "GQ", "GQX", "DPF", "SB"
+            ],
+            "INFO" : [
+                "SNVHPOL", "MQ"
+            ],
+            "MUNGED" : [
+                "QUAL", "NEARBY", "FILTER"
+            ]
+        }
+    },
+    "copied" : {
+        "dragen_batch_big" : "dragen_batch"
+    }
+}

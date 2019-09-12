@@ -1,0 +1,11 @@
+{
+    "__default__": {
+        "queue" : "c7normal",
+        "memory" : 4000,
+        "name" : "{rule}.{wildcards}",
+        "log" : "{log}"
+    },
+    "TrainModels": {
+        "memory" : 8000
+    }
+}

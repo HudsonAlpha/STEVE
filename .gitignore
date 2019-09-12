@@ -1,0 +1,17 @@
+data/HG001*
+data/SL362490.vcf.gz
+data/SL362490.vcf.gz.tbi
+data/hg38.fa
+data/hg38.fa.fai
+data/hg38_SDF/
+data/md5sum
+data/original_data
+pipeline/
+results_b37/
+scripts/.snakemake/
+scripts/CompareRTG.py
+scripts/__pycache__/
+scripts/oldStats/
+scripts/*.log
+scripts/run_rtg.sh
+scripts/samples.txt
