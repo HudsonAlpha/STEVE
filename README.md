@@ -25,4 +25,22 @@ python3 RunTrainingPipeline.py -t -x [slids]
 ```
 
 ## Variant Evaluation
-Code and information to come soon.
+The following command will actually use the trained models to evaluate variant calls:
+
+```
+python3 EvaluateVariants.py \
+    -m [model] \
+    -r [recall] \
+    -c [codicem] \
+    -v [coordinates] \
+    [model_directory] \
+    [vcf_filename]
+```
+
+### Parameter Notes
+1. `-m [model]` - the model can be "best", "all", or a specific model name (see "all" for the options); "all" will use every model available; "best" will select the model with the lowest FPR at the selected threshold (NOTE: this may be undesirable for variant types with low training/testing volume)
+2. `-r [recall]` - currently accepts "0.99", "0.995", "0.999", and "1.0"
+3. `-c [codicem]` - a Codicem Sanger download file
+4. `-v [coordinates]` - comma separated, coordinates list of the form "chr1:1234-1234" for a single nucleotide variant
+5. `[model_directory]` - the directory containing the models file (this will be under the pipeline subfolder)
+5. `[vcf_filename]` - the raw VCF file, make sure it is the same format as the selected model
