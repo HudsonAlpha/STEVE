@@ -112,7 +112,7 @@ rule TrainModels:
     shell:
         '''
         python3 -u {params.script} \
-            -p {threads} \
+            --split-by-type \
             {params.feature_dir} \
             {params.slids} \
             {params.output_prefix}

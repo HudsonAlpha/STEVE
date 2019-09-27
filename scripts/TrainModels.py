@@ -21,19 +21,20 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import shuffle
 
 #custom imports
-from ExtractFeatures import VAR_SNP, VAR_INDEL, GT_REF_HET, GT_ALT_HOM, GT_HET_HET
+from ExtractFeatures import VAR_SNP, VAR_INDEL, GT_REF_HET, GT_ALT_HOM, GT_HET_HET, GT_REF_HOM
 from RunTrainingPipeline import parseSlids
 
 #define the training mode here
 EXACT_MODE = 0
 GRID_MODE = 1
 
-def trainModels(featureDir, slids, outPrefix):
+def trainModels(featureDir, slids, outPrefix, splitByType):
     '''
     Trains models given a selection of features
     @param featureDir - the directory containing features
     @param slids - a file with one sample ID per line that will be used for training/testing
     @param outPrefix - the output prefix for final models and other data
+    @param splitByType - if True, this will train one model per variant/zygosity type; otherwise a single global model
     '''
     #we will build a list of numpy arrays, then stack at the end
     tpList = []
@@ -71,8 +72,28 @@ def trainModels(featureDir, slids, outPrefix):
         
     #allTP = np.vstack(tpList)
     #allFP = np.vstack(fpList)
-
-    results, trainedModelDict, rocDict = trainAllClassifiers(tpList, fpList, fieldsList)
+    results = {}
+    trainedModelDict = {}
+    rocDict = {}
+    if splitByType:
+        for variantType in [VAR_SNP, VAR_INDEL]:
+            for callType in [GT_REF_HET, GT_ALT_HOM, GT_HET_HET]:
+                print('[%s] Beginning global, filtered training: %s %s' % (str(datetime.datetime.now()), variantType, callType))
+                subResults, subTrainedModelDict, subRocDict = trainAllClassifiers(tpList, fpList, fieldsList, variantType, callType)
+                subKey = str(variantType)+'_'+str(callType)
+                results[subKey] = subResults
+                trainedModelDict[subKey] = subTrainedModelDict
+                rocDict[subKey] = subRocDict
+    else:
+        #no filtering
+        print('[%s] Beginning global, non-filtered training' % (str(datetime.datetime.now()), ))
+        variantType = -1
+        callType = -1
+        subResults, subTrainedModelDict, subRocDict = trainAllClassifiers(tpList, fpList, fieldsList, variantType, callType)
+        subKey = 'all_all'
+        results[subKey] = subResults
+        trainedModelDict[subKey] = subTrainedModelDict
+        rocDict[subKey] = subRocDict
 
     #write outputs
     jsonFN = '%s/stats.json' % (outPrefix, )
@@ -95,34 +116,40 @@ def trainModels(featureDir, slids, outPrefix):
 
     print('[%s] All models finished training!' % (str(datetime.datetime.now()), ))
 
-def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels):
+def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, callType):
     '''
     This performs the actual training of the models for us
     @param raw_tpList - a list of numpy arrays corresponding to true positive variants
     @param raw_fpList - a list of numpy arrays corresponding to false positive variants
     @param raw_featureLabels - the ordered feature labels for the tpList and fpList arrays
+    @param variantType - the allowed variant type
+    @param callType - the allowed call type
     @return - a dictionary of many results
     '''
     ret = {}
     modelRet = {}
     rocRet = {}
 
+    filterEnabled = (variantType != -1 or callType != -1)
+    if filterEnabled:
+        assert(variantType != -1 and callType != -1)
+
     #parameters we will use for all training
     configuration = {
         'TRAINING_MODE' : EXACT_MODE,
         'USE_SUBSET' : False, #change to false when debugging is complete
         'SUBSET_SIZE' : 1000,
-        'FILTER_VARIANTS_BY_TYPE' : True,
-        'FILTER_VAR_TYPE' : VAR_SNP,
-        'FILTER_CALL_TYPE' : GT_REF_HET,
+        'FILTER_VARIANTS_BY_TYPE' : filterEnabled,
+        'FILTER_VAR_TYPE' : variantType,
+        'FILTER_CALL_TYPE' : callType,
         'MANUAL_FS' : True,
         'FLIP_TP' : True
     }
     
-    FILTER_VARIANTS_BY_TYPE = configuration.get('FILTER_VARIANTS_BY_TYPE', False) #if True, filter down to a particular type of variant (see next two configs)
-    FILTER_VAR_TYPE = configuration.get('FILTER_VAR_TYPE', VAR_SNP) #set the type of variant to allow through
-    FILTER_CALL_TYPE = configuration.get('FILTER_CALL_TYPE', GT_REF_HET) #set the call of the variant to allow through
-    MANUAL_FS = configuration.get('MANUAL_FS', False)
+    FILTER_VARIANTS_BY_TYPE = configuration['FILTER_VARIANTS_BY_TYPE'] #if True, filter down to a particular type of variant (see next two configs)
+    FILTER_VAR_TYPE = configuration['FILTER_VAR_TYPE']#set the type of variant to allow through
+    FILTER_CALL_TYPE = configuration['FILTER_CALL_TYPE'] #set the call of the variant to allow through
+    MANUAL_FS = configuration['MANUAL_FS'] #if True, manually remove some features that are generally useless
     
     #do all filtering at this stage for ease downstream
     REMOVED_LABELS = []
@@ -488,7 +515,8 @@ if __name__ == "__main__":
     
     #optional arguments with default
     #p.add_argument('-d', '--date-subdir', dest='date_subdir', default=None, help='the date subdirectory (default: "hli-YYMMDD")')
-    p.add_argument('-p', '--processes', dest='processes', type=int, default=1, help='the number of processes to use (default: 1)')
+    #p.add_argument('-p', '--processes', dest='processes', type=int, default=1, help='the number of processes to use (default: 1)')
+    p.add_argument('-s', '--split-by-type', dest='split_by_type', action='store_true', default=False, help='split into multiple models by variant/zygosity types (default: False)')
 
     #required main arguments
     p.add_argument('feature_dir', type=str, help='directory containing extracted features')
@@ -498,4 +526,4 @@ if __name__ == "__main__":
     #parse the arguments
     args = p.parse_args()
 
-    trainModels(args.feature_dir, args.slids, args.output_prefix)
+    trainModels(args.feature_dir, args.slids, args.output_prefix, args.split_by_type)

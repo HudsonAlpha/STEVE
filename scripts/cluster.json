@@ -6,6 +6,6 @@
         "log" : "{log}"
     },
     "TrainModels": {
-        "memory" : 8000
+        "memory" : 16000
     }
 }

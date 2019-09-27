@@ -16,10 +16,12 @@ DEFAULT_MISSING = -1000.0
 GT_REF_HET = 0
 GT_ALT_HOM = 1
 GT_HET_HET = 2
+GT_REF_HOM = 3
 GT_TRANSLATE = {
     GT_REF_HET : 'HET',
     GT_ALT_HOM : 'HOM',
-    GT_HET_HET : 'HE2'
+    GT_HET_HET : 'HE2',
+    GT_REF_HOM : 'HOMREF'
 }
 
 #Variant type constants
@@ -93,7 +95,10 @@ def getVariantFeatures(variant, sampleID, fields, rawReader):
             #these are call specific measures
             if subk == 'GT':
                 if gtPieces[0] == gtPieces[1]:
-                    val = GT_ALT_HOM
+                    if gtPieces[0] == '0':
+                        val = GT_REF_HOM
+                    else:
+                        val = GT_ALT_HOM
                 elif gtPieces[0] == '0' or gtPieces[1] == '0':
                     val = GT_REF_HET
                 else:
