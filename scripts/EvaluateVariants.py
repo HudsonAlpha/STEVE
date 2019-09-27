@@ -6,7 +6,7 @@ import numpy as np
 import pickle
 import vcf
 
-from ExtractFeatures import ALL_METRICS, getVariantFeatures
+from ExtractFeatures import ALL_METRICS, getVariantFeatures, GT_TRANSLATE, VAR_TRANSLATE
 
 def evaluateVariants(args):
     '''
@@ -17,11 +17,17 @@ def evaluateVariants(args):
     stats, models = loadModels(args.model_directory)
     #print(json.dumps(stats, indent=4))
 
+    #run each model (it only prints if the model applies)
     for k in stats.keys():
-        runSubType(k, args, stats[k], models[k])
+        reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
+        runSubType(reformKey, args, stats[k], models[k])
 
 def runSubType(variantType, args, stats, models):
     '''
+    @param variantType - the variant name
+    @param args - the command line arguments
+    @param stats - the stats for the variantType
+    @param models - the models for the variantType
     '''
     modelName = args.model
     targetRecall = args.recall

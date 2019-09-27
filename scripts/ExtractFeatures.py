@@ -27,6 +27,10 @@ GT_TRANSLATE = {
 #Variant type constants
 VAR_SNP = 0
 VAR_INDEL = 1
+VAR_TRANSLATE = {
+    VAR_SNP : 'SNP',
+    VAR_INDEL : 'INDEL'
+}
 
 #this file contains all the metrics we care about for each variant caller
 METRICS_FN = '/gpfs/gpfs1/home/jholt/sanger_less_tests/scripts/model_metrics.json'
