@@ -21,6 +21,11 @@ def evaluateVariants(args):
     for k in stats.keys():
         reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
         runSubType(reformKey, args, stats[k], models[k])
+    
+    for k in ['0_3', '1_3']:
+        if k not in stats.keys():
+            reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
+            runReferenceCalls(reformKey, args, int(k.split('_')[0]), int(k.split('_')[1]))
 
 def runSubType(variantType, args, stats, models):
     '''
@@ -40,12 +45,24 @@ def runSubType(variantType, args, stats, models):
     #figure out which models we will actually be using
     if modelName == 'best':
         bestModelName = None
-        bestFPR = 1.0
+        #bestFPR = 1.0
+        bestHM = 0.0
         for mn in stats.keys():
-            modelFPR = stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_FPR'][0]
-            if modelFPR < bestFPR:
+            #modelFPR = stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_FPR'][0]
+            #if modelFPR < bestFPR:
+                #bestModelName = mn
+                #bestFPR = modelFPR
+            modelCM = np.array(stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_CM'][0])
+            if (np.sum(modelCM[:, 1]) == 0.0 or np.sum(modelCM[1, :]) == 0):
+                modelHM = 0.0
+            else:
+                modelRecall = modelCM[1, 1] / (modelCM[1, 0] + modelCM[1, 1])
+                modelPrecision = modelCM[1, 1] / (modelCM[0, 1] + modelCM[1, 1])
+                modelHM = 2 * modelRecall * modelPrecision * (modelRecall+modelPrecision)
+            if modelHM > bestHM or bestModelName == None:
                 bestModelName = mn
-                bestFPR = modelFPR
+                bestHM = modelHM
+            
         evalList = [bestModelName]
     elif modelName == 'all':
         evalList = sorted(stats.keys())
@@ -108,7 +125,7 @@ def runSubType(variantType, args, stats, models):
 
         #now go through each variant and pull out the features for it
         for variant in variantList:
-            featureVals = getVariantFeatures(variant, vcfReader.samples[0], fields, rawReader)
+            featureVals = getVariantFeatures(variant, vcfReader.samples[0], fields, rawReader, allowHomRef=True)
             varFeatures.append(featureVals)
             rawGT.append(featureVals[gtIndex])
     
@@ -162,6 +179,92 @@ def runSubType(variantType, args, stats, models):
         for vals in valList:
             print(*vals, sep='\t')
     print()
+
+def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
+    '''
+    TODO
+    '''
+    #make sure all feature sets are identical and set up the additional field also
+    filtersEnabled = (acceptedVT != -1 or acceptedGT != -1)
+    
+    if filtersEnabled:
+        fields = [('VAR', 'TYPE'), ('CALL', 'GT')]
+    gtIndex = fields.index(('CALL', 'GT'))
+
+    #load the variant list
+    allVariants = []
+    if args.variants != None:
+        raise Exception('No impl')
+    
+    if args.codicem != None:
+        allVariants += loadCodicemVariants(args.codicem)
+    
+    #now load the VCF file
+    vcfReader = vcf.Reader(filename=args.sample_vcf, compressed=True)
+    rawReader = vcf.Reader(filename=args.sample_vcf, compressed=True)
+    assert(len(vcfReader.samples) == 1)
+    chromList = vcfReader.contigs.keys()
+
+    #go through each variant and extract the features into a shared set
+    varIndex = []
+    rawVariants = []
+    rawGT = []
+    varFeatures = []
+    for i, (chrom, start, end, ref, alt) in enumerate(allVariants):
+        if (chrom not in chromList and
+            'chr'+chrom in chromList):
+            chrom = 'chr'+chrom
+        
+        if chrom in chromList:
+            variantList = [variant for variant in vcfReader.fetch(chrom, start, end)]
+        else:
+            print('Chromosome "%s" not found' % (chrom, ))
+            variantList = []
+            
+        #save the raw variants and which source it is tied to
+        rawVariants += variantList
+        varIndex += [i]*len(variantList)
+
+        #now go through each variant and pull out the features for it
+        for variant in variantList:
+            featureVals = getVariantFeatures(variant, vcfReader.samples[0], fields, rawReader, allowHomRef=True)
+            varFeatures.append(featureVals)
+            rawGT.append(featureVals[gtIndex])
+    
+    #convert to array 
+    varIndex = np.array(varIndex)
+    
+    #now lets make the actual reporting of things
+    header = [
+        'chrom', 'start', 'end', 'ref', 'alt', 'call_variant', 'call_gt'
+    ]
+    
+    print(variantType)
+    print(*header, sep='\t')
+    for i, (chrom, start, end, ref, alt) in enumerate(allVariants):
+        foundVarIndices = np.where(varIndex == i)[0]
+        valList = []
+        if foundVarIndices.shape[0] == 0:
+            vals = [chrom, start, end, ref, alt, 'VARIANT_NOT_FOUND', 'VARIANT_NOT_FOUND']
+            valList.append(vals)
+        else:
+            for ind in foundVarIndices:
+                vals = [chrom, start, end, ref, alt, rawVariants[ind], rawGT[ind]]
+                resultsFound = False
+                if filtersEnabled and (acceptedVT != varFeatures[ind][0] or 
+                    acceptedGT != varFeatures[ind][1]):
+                    #one of variant type or genotype call don't fit this trained model
+                    pass
+                else:
+                    vals.append('FP')
+                    resultsFound = True
+                
+                if(resultsFound):
+                    valList.append(vals)
+        
+        for vals in valList:
+            print(*vals, sep='\t')
+    print()
     
 def loadModels(modelDir):
     '''
@@ -198,7 +301,9 @@ def loadCodicemVariants(csvFN):
         end = int(d['Stop'])
         ref = d['Reference']
         alt = d['Alternate']
-        ret.append((chrom, start, end, ref, alt))
+        var = (chrom, start, end, ref, alt)
+        if (var not in ret):
+            ret.append(var)
     fp.close()
     return ret
 

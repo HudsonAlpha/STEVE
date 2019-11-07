@@ -46,7 +46,7 @@ for k in UNPARSED_METRICS['copied']:
     assert(k not in ALL_METRICS)
     ALL_METRICS[k] = ALL_METRICS[UNPARSED_METRICS['copied'][k]]
 
-def getVariantFeatures(variant, sampleID, fields, rawReader):
+def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
     '''
     This function takes a variant from a VCF and a sample ID and extracts the features for it
     @param variant - the variant (from "vcfReader")
@@ -59,11 +59,17 @@ def getVariantFeatures(variant, sampleID, fields, rawReader):
 
     #first, annotate whether it's a SNP or an indel
     callStats = variant.genotype(sampleID)
-    gtPieces = re.split('[/|]', callStats['GT'])
+    if '.' in callStats['GT']:
+        gtPieces = ['0', '0']
+    else:
+        gtPieces = re.split('[/|]', callStats['GT'])
+    
     if len(gtPieces) != 2:
         #TODO: only a problem in strelka, how to handle it?
         return None
-    assert(gtPieces[0] != '0' or gtPieces[1] != '0')
+    
+    if not allowHomRef:
+        assert(gtPieces[0] != '0' or gtPieces[1] != '0')
     
     #look at the variant call
     s1 = (variant.REF if gtPieces[0] == '0' else variant.ALT[int(gtPieces[0])-1])
@@ -160,7 +166,10 @@ def getVariantFeatures(variant, sampleID, fields, rawReader):
                     annots.append(DEFAULT_MISSING)
             elif subk == 'QUAL':
                 val = variant.QUAL
-                annots.append(val)
+                if val == None:
+                    annots.append(DEFAULT_MISSING)
+                else:
+                    annots.append(val)
             elif subk == 'NEARBY':
                 #search the raw VCF for nearby calls
                 nearbyFound = 0

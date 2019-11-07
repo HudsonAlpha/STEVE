@@ -9,7 +9,8 @@ EXTRACT_SCRIPT = os.path.dirname(os.path.realpath(PIPELINE_DIRECTORY))+'/scripts
 TRAINING_SCRIPT = os.path.dirname(os.path.realpath(PIPELINE_DIRECTORY))+'/scripts/TrainModels.py'
 ALIGNERS = [
     #'bwa-mem-0.7.17',
-    'bwa-mem-0.7.17-BQSR'
+    'bwa-mem-0.7.17-BQSR',
+    #'sentieon-201808.07'
 ]
 VARIANT_CALLERS = [
     'strelka-2.9.10'
@@ -17,7 +18,7 @@ VARIANT_CALLERS = [
 FULL_PIPES = [
     ('dragen-07.011.352.3.2.8b', 'dragen-07.011.352.3.2.8b')
 ]
-THREADS_PER_PROC = 8
+THREADS_PER_PROC = 16
 
 #parse the sample names for the next steps
 RAW_SLIDS = config['sampleData']
@@ -108,11 +109,12 @@ rule TrainModels:
         slids=RAW_SLIDS,
         output_prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
     log: "{pipeline_dir}/logs/trained_models/{aligner}/{caller}_training.log"
-    threads: 1 #this currently isn't multi-threaded in any way
+    threads: THREADS_PER_PROC #only applies to CV, but still a big speedup
     shell:
         '''
         python3 -u {params.script} \
             --split-by-type \
+            -p {threads} \
             {params.feature_dir} \
             {params.slids} \
             {params.output_prefix}
