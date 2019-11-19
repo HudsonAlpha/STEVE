@@ -13,29 +13,64 @@ def evaluateVariants(args):
     This is the work-horse function
     @param args - the command line arguments
     '''
+    #open file if we're doing output that way
+    if args.outFN != None:
+        fp = open(args.outFN, 'wt+')
+
+    #header comes first
+    headerValues = [
+        ['[Run_Parameters]'],
+        ['Models', args.model_directory],
+        ['Target_Recall', args.recall],
+        ['Model_Mode', args.model],
+        ['VCF', args.sample_vcf],
+        ['Codicem_Variants', args.codicem],
+        ['Raw_Variants', args.variants],
+        []
+    ]
+    for frags in headerValues:
+        if args.outFN == None:
+            print(*frags, sep='\t')
+        else:
+            fp.write('\t'.join([str(f) for f in frags])+'\n')
+    
     #load the models
     stats, models = loadModels(args.model_directory)
-    #print(json.dumps(stats, indent=4))
 
     #run each model (it only prints if the model applies)
     for k in stats.keys():
         reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
-        runSubType(reformKey, args, stats[k], models[k])
+        retLines = runSubType(reformKey, args, stats[k], models[k], k)
+        for frags in retLines:
+            if args.outFN == None:
+                print(*frags, sep='\t')
+            else:
+                fp.write('\t'.join([str(f) for f in frags])+'\n')
     
     for k in ['0_3', '1_3']:
         if k not in stats.keys():
             reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
-            runReferenceCalls(reformKey, args, int(k.split('_')[0]), int(k.split('_')[1]))
+            retLines = runReferenceCalls(reformKey, args, int(k.split('_')[0]), int(k.split('_')[1]))
+            for frags in retLines:
+                if args.outFN == None:
+                    print(*frags, sep='\t')
+                else:
+                    fp.write('\t'.join([str(f) for f in frags])+'\n')
+    
+    if args.outFN != None:
+        fp.close()
 
-def runSubType(variantType, args, stats, models):
+def runSubType(variantType, args, stats, models, statKey):
     '''
     @param variantType - the variant name
     @param args - the command line arguments
     @param stats - the stats for the variantType
     @param models - the models for the variantType
+    @param statKey - the statKey (form '0_1')
     '''
     modelName = args.model
     targetRecall = args.recall
+    retLines = []
 
     #make sure our recall is in the list
     availableRecalls = stats[list(stats.keys())[0]]['ALL_SUMMARY'].keys()
@@ -44,26 +79,67 @@ def runSubType(variantType, args, stats, models):
 
     #figure out which models we will actually be using
     if modelName == 'best':
+        #best evaluate based on harmonic mean of the overall testing results
         bestModelName = None
-        #bestFPR = 1.0
         bestHM = 0.0
         for mn in stats.keys():
-            #modelFPR = stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_FPR'][0]
-            #if modelFPR < bestFPR:
-                #bestModelName = mn
-                #bestFPR = modelFPR
+            #CM = confusion matrix
+            modelCM = np.array(stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_CM'][0])
+            if (np.sum(modelCM[:, 1]) == 0.0 or np.sum(modelCM[1, :]) == 0):
+                modelHM = 0.0
+            else:
+                #best is harmonic mean of recall and TNR
+                modelRecall = modelCM[1, 1] / (modelCM[1, 0] + modelCM[1, 1])
+                #modelPrecision = modelCM[1, 1] / (modelCM[0, 1] + modelCM[1, 1])
+                modelTNR = modelCM[0, 0] / (modelCM[0, 0] + modelCM[0, 1])
+                modelHM = 2 * modelRecall * modelTNR / (modelRecall+modelTNR)
+            if modelHM > bestHM or bestModelName == None:
+                bestModelName = mn
+                bestHM = modelHM
+        evalList = [bestModelName]
+    elif modelName == 'clinical':
+        targetThresholds = {
+            '0.995' : 0.99
+        }
+        if targetRecall not in targetThresholds:
+            raise Exception('"clinical" mode has no defined threshold for target recall "%s"' % targetRecall)
+        acceptedRecall = targetThresholds[targetRecall]
+        
+        bestModelName = None
+        bestHM = 0.0
+        for mn in stats.keys():
+            #CM = confusion matrix
             modelCM = np.array(stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_CM'][0])
             if (np.sum(modelCM[:, 1]) == 0.0 or np.sum(modelCM[1, :]) == 0):
                 modelHM = 0.0
             else:
                 modelRecall = modelCM[1, 1] / (modelCM[1, 0] + modelCM[1, 1])
-                modelPrecision = modelCM[1, 1] / (modelCM[0, 1] + modelCM[1, 1])
-                modelHM = 2 * modelRecall * modelPrecision * (modelRecall+modelPrecision)
-            if modelHM > bestHM or bestModelName == None:
+                trainTPR = np.array(stats[mn]['LEAVEONEOUT_SUMMARY'][targetRecall]['TEST_TPR'])
+                trainAvg = np.mean(trainTPR)
+                trainStd = np.std(trainTPR)
+
+                #if the average training low end is too low OR the final model is outside the training bounds
+                # THEN we will not use the model
+                twoSDBottom = trainAvg - 2*trainStd
+                if (twoSDBottom < acceptedRecall or
+                    modelRecall < twoSDBottom):
+                    modelHM = 0.0
+                else:
+                    #in clinical, best is harmonic mean of our adjusted recall and our TNR
+                    modelTNR = modelCM[0, 0] / (modelCM[0, 0] + modelCM[0, 1])
+                    adjRecall = (modelRecall*100 - 99)
+                    modelHM = 2 * adjRecall * modelTNR / (adjRecall+modelTNR)
+                    
+            if modelHM > bestHM:
                 bestModelName = mn
                 bestHM = modelHM
-            
-        evalList = [bestModelName]
+        
+        if bestModelName == None:
+            #this is the unfortunate event that NO model passes 
+            return retLines+runReferenceCalls(variantType, args, int(statKey.split('_')[0]), int(statKey.split('_')[1]))
+        else:
+            evalList = [bestModelName]
+
     elif modelName == 'all':
         evalList = sorted(stats.keys())
     elif modelName in stats:
@@ -116,7 +192,7 @@ def runSubType(variantType, args, stats, models):
         if chrom in chromList:
             variantList = [variant for variant in vcfReader.fetch(chrom, start, end)]
         else:
-            print('Chromosome "%s" not found' % (chrom, ))
+            print('WARNING: Chromosome "%s" not found' % (chrom, ))
             variantList = []
             
         #save the raw variants and which source it is tied to
@@ -152,8 +228,8 @@ def runSubType(variantType, args, stats, models):
         'chrom', 'start', 'end', 'ref', 'alt', 'call_variant', 'call_gt'
     ]+['%s (%0.4f, %0.4f)' % (mn, stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_TPR'][0], stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_FPR'][0]) for mn in evalList]
     
-    print(variantType)
-    print(*header, sep='\t')
+    retLines.append(['['+variantType+']'])
+    retLines.append(header)
     for i, (chrom, start, end, ref, alt) in enumerate(allVariants):
         foundVarIndices = np.where(varIndex == i)[0]
         valList = []
@@ -177,13 +253,18 @@ def runSubType(variantType, args, stats, models):
                     valList.append(vals)
         
         for vals in valList:
-            print(*vals, sep='\t')
-    print()
+            #print(*vals, sep='\t')
+            retLines.append(vals)
+    #print()
+    retLines.append([])
+    return retLines
 
 def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
     '''
     TODO
     '''
+    retLines = []
+
     #make sure all feature sets are identical and set up the additional field also
     filtersEnabled = (acceptedVT != -1 or acceptedGT != -1)
     
@@ -218,7 +299,7 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
         if chrom in chromList:
             variantList = [variant for variant in vcfReader.fetch(chrom, start, end)]
         else:
-            print('Chromosome "%s" not found' % (chrom, ))
+            print('WARNING: Chromosome "%s" not found' % (chrom, ))
             variantList = []
             
         #save the raw variants and which source it is tied to
@@ -236,11 +317,11 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
     
     #now lets make the actual reporting of things
     header = [
-        'chrom', 'start', 'end', 'ref', 'alt', 'call_variant', 'call_gt'
+        'chrom', 'start', 'end', 'ref', 'alt', 'call_variant', 'call_gt', 'NO_MODEL'
     ]
     
-    print(variantType)
-    print(*header, sep='\t')
+    retLines.append(['['+variantType+']'])
+    retLines.append(header)
     for i, (chrom, start, end, ref, alt) in enumerate(allVariants):
         foundVarIndices = np.where(varIndex == i)[0]
         valList = []
@@ -263,8 +344,9 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
                     valList.append(vals)
         
         for vals in valList:
-            print(*vals, sep='\t')
-    print()
+            retLines.append(vals)
+    retLines.append([])
+    return retLines
     
 def loadModels(modelDir):
     '''
@@ -317,6 +399,7 @@ if __name__ == "__main__":
     p.add_argument('-v', '--variants', dest='variants', default=None, help='variant coordinates to evaluate (default: None)')
     p.add_argument('-m', '--model', dest='model', default='best', help='the model name to use (default: best)')
     p.add_argument('-r', '--recall', dest='recall', default='0.99', help='the target recall value from training (default: 0.99)')
+    p.add_argument('-o', '--output', dest='outFN', default=None, help='the place to send output to (default: stdout)')
 
     #required main arguments
     p.add_argument('model_directory', type=str, help='directory with models and model stats')
