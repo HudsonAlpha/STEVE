@@ -40,7 +40,7 @@ def evaluateVariants(args):
     #run each model (it only prints if the model applies)
     for k in stats.keys():
         reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
-        retLines = runSubType(reformKey, args, stats[k], models[k], k)
+        retLines, retDict = runSubType(reformKey, args, stats[k], models[k], k)
         for frags in retLines:
             if args.outFN == None:
                 print(*frags, sep='\t')
@@ -50,7 +50,7 @@ def evaluateVariants(args):
     for k in ['0_3', '1_3']:
         if k not in stats.keys():
             reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
-            retLines = runReferenceCalls(reformKey, args, int(k.split('_')[0]), int(k.split('_')[1]))
+            retLines, retDict = runReferenceCalls(reformKey, args, int(k.split('_')[0]), int(k.split('_')[1]))
             for frags in retLines:
                 if args.outFN == None:
                     print(*frags, sep='\t')
@@ -70,7 +70,12 @@ def runSubType(variantType, args, stats, models, statKey):
     '''
     modelName = args.model
     targetRecall = args.recall
+
+    #overwrite this is the model target doesn't match the passed in target
+    modelTargetRecall = args.recall
+    
     retLines = []
+    retDictForm = []
 
     #make sure our recall is in the list
     availableRecalls = stats[list(stats.keys())[0]]['ALL_SUMMARY'].keys()
@@ -136,8 +141,61 @@ def runSubType(variantType, args, stats, models, statKey):
         
         if bestModelName == None:
             #this is the unfortunate event that NO model passes 
-            return retLines+runReferenceCalls(variantType, args, int(statKey.split('_')[0]), int(statKey.split('_')[1]))
+            recurseLines, recurseDicts = runReferenceCalls(variantType, args, int(statKey.split('_')[0]), int(statKey.split('_')[1]))
+            return retLines+recurseLines, retDictForm+recurseLines
         else:
+            evalList = [bestModelName]
+    
+    elif modelName == 'clinical_v2':
+        targetThresholds = {
+            '0.995' : 0.99
+        }
+        if targetRecall not in targetThresholds:
+            raise Exception('"clinical" mode has no defined threshold for target recall "%s"' % targetRecall)
+        acceptedRecall = targetThresholds[targetRecall]
+        
+        bestModelTargetRecall = None
+        bestModelName = None
+        bestHM = 0.0
+        for mn in stats.keys():
+            for tr in stats[mn]['ALL_SUMMARY']:
+                #CM = confusion matrix
+                modelCM = np.array(stats[mn]['ALL_SUMMARY'][tr]['TEST_CM'][0])
+                if (np.sum(modelCM[:, 1]) == 0.0 or np.sum(modelCM[1, :]) == 0):
+                    modelHM = 0.0
+                else:
+                    modelRecall = modelCM[1, 1] / (modelCM[1, 0] + modelCM[1, 1])
+                    trainTPR = np.array(stats[mn]['LEAVEONEOUT_SUMMARY'][tr]['TEST_TPR'])
+                    trainAvg = np.mean(trainTPR)
+                    trainStd = np.std(trainTPR)
+
+                    #if the average training low end is too low OR the final model is outside the training bounds
+                    # THEN we will not use the model
+                    twoSDBottom = trainAvg - 2*trainStd
+                    if (twoSDBottom < acceptedRecall or
+                        modelRecall < twoSDBottom):
+                        modelHM = 0.0
+                    else:
+                        #in clinical, best is harmonic mean of our adjusted recall and our TNR
+                        modelTNR = modelCM[0, 0] / (modelCM[0, 0] + modelCM[0, 1])
+                        #adjRecall = (modelRecall*100 - 99)
+                        #adjRecall = modelRecall
+                        adjRecall = (modelRecall - acceptedRecall) / (float(targetRecall) - acceptedRecall)
+                        if adjRecall > 1.0:
+                            adjRecall = 1.0
+                        modelHM = 2 * adjRecall * modelTNR / (adjRecall+modelTNR)
+                        
+                if modelHM > bestHM:
+                    bestModelTargetRecall = tr
+                    bestModelName = mn
+                    bestHM = modelHM
+        
+        if bestModelName == None:
+            #this is the unfortunate event that NO model passes 
+            recurseLines, recurseDicts = runReferenceCalls(variantType, args, int(statKey.split('_')[0]), int(statKey.split('_')[1]))
+            return retLines+recurseLines, retDictForm+recurseLines
+        else:
+            modelTargetRecall = bestModelTargetRecall
             evalList = [bestModelName]
 
     elif modelName == 'all':
@@ -205,40 +263,46 @@ def runSubType(variantType, args, stats, models, statKey):
             varFeatures.append(featureVals)
             rawGT.append(featureVals[gtIndex])
     
-    #convert to array 
-    varIndex = np.array(varIndex)
-    allFeatures = np.array(varFeatures)
-    if filtersEnabled:
-        coreFeatures = allFeatures[:, 2:]
-    else:
-        coreFeatures = allFeatures
+    #if there are no variants, the following will throw errors
+    if len(allVariants) > 0:
+        #convert to array 
+        varIndex = np.array(varIndex)
+        allFeatures = np.array(varFeatures)
+        if filtersEnabled:
+            coreFeatures = allFeatures[:, 2:]
+        else:
+            coreFeatures = allFeatures
 
-    #do the actual predictions now
-    prediction = {}
-    for mn in evalList:
-        clf = models[mn]['MODEL']
-        thresh = stats[mn]['ALL_SUMMARY'][targetRecall]['TRAIN_THRESHOLD'][0]
-        y_pred_prob = clf.predict_proba(coreFeatures)[:, 1]
-        adjPred = ['FP' if y >= thresh else 'TP' for y in y_pred_prob]
-        prediction[mn] = adjPred
-        #print(mn, adjPred)
+        #do the actual predictions now
+        prediction = {}
+        for mn in evalList:
+            clf = models[mn]['MODEL']
+            thresh = stats[mn]['ALL_SUMMARY'][modelTargetRecall]['TRAIN_THRESHOLD'][0]
+            y_pred_prob = clf.predict_proba(coreFeatures)[:, 1]
+            adjPred = ['FP' if y >= thresh else 'TP' for y in y_pred_prob]
+            prediction[mn] = adjPred
+            #print(mn, adjPred)
     
     #now lets make the actual reporting of things
     header = [
         'chrom', 'start', 'end', 'ref', 'alt', 'call_variant', 'call_gt'
-    ]+['%s (%0.4f, %0.4f)' % (mn, stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_TPR'][0], stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_FPR'][0]) for mn in evalList]
+    ]+['%s (%s, %0.4f, %0.4f)' % (mn, modelTargetRecall, stats[mn]['ALL_SUMMARY'][modelTargetRecall]['TEST_TPR'][0], stats[mn]['ALL_SUMMARY'][modelTargetRecall]['TEST_FPR'][0]) for mn in evalList]
     
     retLines.append(['['+variantType+']'])
     retLines.append(header)
     for i, (chrom, start, end, ref, alt) in enumerate(allVariants):
         foundVarIndices = np.where(varIndex == i)[0]
         valList = []
+        dictList = []
         if foundVarIndices.shape[0] == 0:
             vals = [chrom, start, end, ref, alt, 'VARIANT_NOT_FOUND', 'VARIANT_NOT_FOUND']+['--']*len(evalList)
             valList.append(vals)
+
+            #if it's not found, we DON'T put it in the dictionary list
         else:
             for ind in foundVarIndices:
                 vals = [chrom, start, end, ref, alt, rawVariants[ind], rawGT[ind]]
+                modelResultDict = {}
                 resultsFound = False
                 for mn in evalList:
                     if filtersEnabled and (acceptedVT != varFeatures[ind][0] or 
@@ -247,23 +311,43 @@ def runSubType(variantType, args, stats, models, statKey):
                         vals.append('VT_GT_MISMATCH')
                     else:
                         vals.append(prediction[mn][ind])
+                        modelString = '%s (%s, %0.4f, %0.4f)' % (mn, modelTargetRecall, stats[mn]['ALL_SUMMARY'][modelTargetRecall]['TEST_TPR'][0], stats[mn]['ALL_SUMMARY'][modelTargetRecall]['TEST_FPR'][0])
+                        modelResultDict[modelString] = prediction[mn][ind]
                         resultsFound = True
                 
                 if(resultsFound):
                     valList.append(vals)
+
+                    #build the dict form
+                    d = {
+                        'chrom' : chrom,
+                        'start' : start,
+                        'end' : end,
+                        'ref' : ref,
+                        'alt' : alt,
+                        'call_variant' : rawVariants[ind],
+                        'call_gt' : rawGT[ind],
+                        'predictions' : modelResultDict
+                    }
+                    dictList.append(d)
         
         for vals in valList:
             #print(*vals, sep='\t')
             retLines.append(vals)
+
+        for d in dictList:
+            retDictForm.append(d)
+
     #print()
     retLines.append([])
-    return retLines
+    return retLines, retDictForm
 
 def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
     '''
     TODO
     '''
     retLines = []
+    retDictForm = []
 
     #make sure all feature sets are identical and set up the additional field also
     filtersEnabled = (acceptedVT != -1 or acceptedGT != -1)
@@ -325,12 +409,14 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
     for i, (chrom, start, end, ref, alt) in enumerate(allVariants):
         foundVarIndices = np.where(varIndex == i)[0]
         valList = []
+        dictList = []
         if foundVarIndices.shape[0] == 0:
             vals = [chrom, start, end, ref, alt, 'VARIANT_NOT_FOUND', 'VARIANT_NOT_FOUND']
             valList.append(vals)
         else:
             for ind in foundVarIndices:
                 vals = [chrom, start, end, ref, alt, rawVariants[ind], rawGT[ind]]
+                modelResultDict = {}
                 resultsFound = False
                 if filtersEnabled and (acceptedVT != varFeatures[ind][0] or 
                     acceptedGT != varFeatures[ind][1]):
@@ -338,15 +424,34 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
                     pass
                 else:
                     vals.append('FP')
+                    modelString = 'NO_TRAINED_MODELS'
+                    modelResultDict[modelString] = 'FP'
                     resultsFound = True
                 
                 if(resultsFound):
                     valList.append(vals)
+
+                    #build the dict form
+                    d = {
+                        'chrom' : chrom,
+                        'start' : start,
+                        'end' : end,
+                        'ref' : ref,
+                        'alt' : alt,
+                        'call_variant' : rawVariants[ind],
+                        'call_gt' : rawGT[ind],
+                        'predictions' : modelResultDict
+                    }
+                    dictList.append(d)
         
         for vals in valList:
             retLines.append(vals)
+
+        for d in dictList:
+            retDictForm.append(d)
+        
     retLines.append([])
-    return retLines
+    return retLines, retDictForm
     
 def loadModels(modelDir):
     '''
