@@ -10,7 +10,7 @@ TRAINING_SCRIPT = os.path.dirname(os.path.realpath(PIPELINE_DIRECTORY))+'/script
 ALIGNERS = [
     #'bwa-mem-0.7.17',
     'bwa-mem-0.7.17-BQSR',
-    #'sentieon-201808.07'
+    'sentieon-201808.07'
 ]
 VARIANT_CALLERS = [
     'strelka-2.9.10'
