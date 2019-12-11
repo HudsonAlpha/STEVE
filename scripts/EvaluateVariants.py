@@ -102,7 +102,7 @@ def runSubType(variantType, args, stats, models, statKey):
                 bestModelName = mn
                 bestHM = modelHM
         evalList = [bestModelName]
-    elif modelName == 'clinical':
+    elif modelName == 'clinical_v1':
         targetThresholds = {
             '0.995' : 0.99
         }
@@ -146,7 +146,7 @@ def runSubType(variantType, args, stats, models, statKey):
         else:
             evalList = [bestModelName]
     
-    elif modelName == 'clinical_v2':
+    elif modelName == 'clinical':
         targetThresholds = {
             '0.995' : 0.99
         }
