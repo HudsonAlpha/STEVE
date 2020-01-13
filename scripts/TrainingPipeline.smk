@@ -16,7 +16,8 @@ VARIANT_CALLERS = [
     'strelka-2.9.10'
 ]
 FULL_PIPES = [
-    ('dragen-07.011.352.3.2.8b', 'dragen-07.011.352.3.2.8b')
+    ('dragen-07.011.352.3.2.8b', 'dragen-07.011.352.3.2.8b'),
+    ('clinical_sentieon-201808.07', 'strelka-2.9.10')
 ]
 THREADS_PER_PROC = 16
 
