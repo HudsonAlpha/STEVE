@@ -184,6 +184,9 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
             elif subk == 'FILTER':
                 #store the number of filters applied (PASS doesn't show up in these lists)
                 annots.append(len(variant.FILTER))
+            elif subk == 'ID':
+                #this is basically a boolean flag capturing if the variant has an ID annotation
+                annots.append((0 if variant.ID == None else 1))
             else:
                 raise Exception('Unhandled computed measurement: %s-%s' % (k, subk))
         else:

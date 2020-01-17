@@ -30,7 +30,7 @@
                 "SNVHPOL", "MQ"
             ],
             "MUNGED" : [
-                "QUAL", "NEARBY", "FILTER"
+                "QUAL", "NEARBY", "FILTER", "ID"
             ]
         }
     },
