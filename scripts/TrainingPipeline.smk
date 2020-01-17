@@ -4,11 +4,15 @@ import os
 from RunTrainingPipeline import parseSlids
 
 #Constants for the validated pipeline
-PIPELINE_DIRECTORY = '/gpfs/gpfs1/home/jholt/sanger_less_tests/pipeline'
-EXTRACT_SCRIPT = os.path.dirname(os.path.realpath(PIPELINE_DIRECTORY))+'/scripts/ExtractFeatures.py'
-TRAINING_SCRIPT = os.path.dirname(os.path.realpath(PIPELINE_DIRECTORY))+'/scripts/TrainModels.py'
+REPO_DIRECTORY = '/gpfs/gpfs1/home/jholt/sanger_less_tests'
+DATA_DIRECTORY = '/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/pipeline'
+
+#derived from repo 
+PIPELINE_DIRECTORY = '%s/pipeline' % REPO_DIRECTORY
+EXTRACT_SCRIPT = '%s/scripts/ExtractFeatures.py' % REPO_DIRECTORY
+TRAINING_SCRIPT = '%s/scripts/TrainModels.py' % REPO_DIRECTORY
+
 ALIGNERS = [
-    #'bwa-mem-0.7.17',
     'bwa-mem-0.7.17-BQSR',
     'sentieon-201808.07'
 ]
@@ -32,7 +36,6 @@ def getTrainedModels():
     ret = []
     for al in ALIGNERS:
         for vc in VARIANT_CALLERS:
-            #ret.append('%s/trained_models/%s/%s/model_metadata.json' % (PIPELINE_DIRECTORY, al, vc))
             ret.append('%s/trained_models/%s/%s/models.p' % (PIPELINE_DIRECTORY, al, vc))
     
     for al, vc in FULL_PIPES:
@@ -50,9 +53,9 @@ rule train_models:
 
 rule ExtractFeatures:
     input:
-        rawVcf="/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/pipeline/variant_calls/{aligner}/{caller}/{slid}.vcf.gz",
-        tpVcf="/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/pipeline/rtg_results/{aligner}/{caller}/{slid}/tp.vcf.gz",
-        fpVcf="/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/pipeline/rtg_results/{aligner}/{caller}/{slid}/fp.vcf.gz"
+        rawVcf="%s/variant_calls/{aligner}/{caller}/{slid}.vcf.gz" % DATA_DIRECTORY,
+        tpVcf="%s/rtg_results/{aligner}/{caller}/{slid}/tp.vcf.gz" % DATA_DIRECTORY,
+        fpVcf="%s/rtg_results/{aligner}/{caller}/{slid}/fp.vcf.gz" % DATA_DIRECTORY
     output:
         fp_features="{pipeline_dir}/features/{aligner}/{caller}/{slid}_fp.npy",
         fp_fields="{pipeline_dir}/features/{aligner}/{caller}/{slid}_fp_fields.json",
@@ -100,7 +103,6 @@ rule TrainModels:
         getFeatureFiles
     output:
         #metadata is now captured in the model pickle file
-        #metadata="{pipeline_dir}/trained_models/{aligner}/{caller}/model_metadata.json",
         models="{pipeline_dir}/trained_models/{aligner}/{caller}/models.p",
         rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
         stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"

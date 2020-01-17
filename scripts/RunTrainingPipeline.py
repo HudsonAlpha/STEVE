@@ -7,10 +7,11 @@ import os
 import requests
 import subprocess
 
+#disable by setting to None
+#SLACK_CHANNEL = None
 #SLACK_CHANNEL = "#csl-pipeline"
 SLACK_CHANNEL = "@holtjma"
-#SNAKEFILE_PATH = '/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/scripts/RunPipelines.smk'
-#SNAKEMAKE_CLUSTER_CONFIG = '/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/scripts/cluster.json'
+
 SNAKEFILE_PATH = os.path.dirname(os.path.realpath(__file__))+'/TrainingPipeline.smk'
 SNAKEMAKE_CLUSTER_CONFIG = os.path.dirname(os.path.realpath(__file__))+'/cluster.json'
 
@@ -108,7 +109,6 @@ if __name__ == "__main__":
         '--cluster', '"bsub -o {cluster.log} -J {cluster.name} -n {threads} -M {cluster.memory} -R \\"span[hosts=1] rusage[mem={cluster.memory}]\\""',
         '-j', '5000',
         '--config', 'sampleData="%s"' % (args.slids, ),
-        #'--config', 'sampleData="%s"' % (json.dumps(args.metadata).replace("\"", "\\\""), ), 
         '-p', #always print commands
         '-k', #keep going in the event of partial failure
     ]
@@ -137,7 +137,8 @@ if __name__ == "__main__":
                 'Build SLIDs: '+args.slids,
                 'Build Targets: '+str(buildFrags)
             ]
-            sendSlackMessage(SLACK_CHANNEL, '\n'.join(slackFrags))
+            if SLACK_CHANNEL != None:
+                sendSlackMessage(SLACK_CHANNEL, '\n'.join(slackFrags))
     else:
         print('WARNING: No snakemake objects were specified to be generated.  Exiting without doing any work.')
     
