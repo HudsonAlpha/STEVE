@@ -211,6 +211,10 @@ def runSubType(variantType, args, stats, models, statKey):
     acceptedVT = models[evalList[0]]['FILTER_VAR_TYPE']
     acceptedGT = models[evalList[0]]['FILTER_CALL_TYPE']
     filtersEnabled = (acceptedVT != -1 or acceptedGT != -1)
+
+    #if the filters are enabled, we need to make sure both were filtered; or stuff will break! :O
+    if filtersEnabled:
+        assert(acceptedVT != -1 and acceptedGT != -1)
     
     for mn in evalList:
         mnFeatures = [tuple(f.split('-')) for f in models[mn]['FEATURES']]
@@ -219,6 +223,7 @@ def runSubType(variantType, args, stats, models, statKey):
         assert(acceptedGT == models[mn]['FILTER_CALL_TYPE'])
     
     if filtersEnabled:
+        #VT and GT were filtered out, add them back in here so we can filter our variants 
         fields = [('VAR', 'TYPE'), ('CALL', 'GT')] + coreFeatureNames
     else:
         fields = coreFeatureNames
@@ -270,6 +275,7 @@ def runSubType(variantType, args, stats, models, statKey):
         varIndex = np.array(varIndex)
         allFeatures = np.array(varFeatures)
         if filtersEnabled:
+            #we added ('VAR', 'TYPE'), ('CALL', 'GT') earlier, so remove them now or the model will blow up
             coreFeatures = allFeatures[:, 2:]
         else:
             coreFeatures = allFeatures
