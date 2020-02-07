@@ -93,6 +93,8 @@ if __name__ == "__main__":
     p = ap.ArgumentParser(description=DESC, formatter_class=ap.RawTextHelpFormatter)
     
     #optional arguments with default
+    p.add_argument('-d', '--data-stats', dest='data_stats', action='store_true', default=False, help='get data statistics on features (default: False)')
+    p.add_argument('-s', '--summarize-models', dest='summarize_models', action='store_true', default=False, help='summarize model results (default: False)')
     p.add_argument('-t', '--train-models', dest='train_models', action='store_true', default=False, help='train the models using the pipeline structure (default: False)')
     p.add_argument('-x', '--execute', dest='execute', action='store_true', default=False, help='execute the commands (default: False)')
 
@@ -124,6 +126,14 @@ if __name__ == "__main__":
     if args.train_models:
         somethingToDo = True
         buildFrags.append('train_models')
+
+    if args.summarize_models:
+        somethingToDo = True
+        buildFrags.append('summarize_models')
+    
+    if args.data_stats:
+        somethingToDo = True
+        buildFrags.append('data_stats')
 
     if somethingToDo:
         fullCmd = ' '.join(snakemakeFrags+buildFrags)

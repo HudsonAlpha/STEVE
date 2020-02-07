@@ -6,6 +6,7 @@ matplotlib.use('AGG')
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import pickle
 
 from ExtractFeatures import GT_TRANSLATE, VAR_TRANSLATE
 
@@ -21,6 +22,12 @@ def printAllStats(modelDir, rocDir, minRecall, targetRecall):
     jsonFN = '%s/stats.json' % (modelDir, )
     fp = open(jsonFN, 'r')
     stats = json.load(fp)
+    fp.close()
+
+    #read in the models
+    modelPickleFN = '%s/models.p' % (modelDir, )
+    fp = open(modelPickleFN, 'rb')
+    models = pickle.load(fp)
     fp.close()
 
     if rocDir != None:
@@ -40,7 +47,7 @@ def printAllStats(modelDir, rocDir, minRecall, targetRecall):
         if rocDir != None:
             createRocImage(reformKey, rocs[k], rocDir)
     
-    printClinicalModels(stats, minRecall, targetRecall)
+    printClinicalModels(stats, minRecall, targetRecall, models)
 
 def printModelStats(modelType, stats):
     '''
@@ -54,10 +61,11 @@ def printModelStats(modelType, stats):
     #pull out test size also
     testResults = stats[evalList[0]]['ALL_SUMMARY'][availableRecalls[0]]['TEST_CM'][0]
     testTN, testTP = np.sum(testResults, axis=1)
-    print(modelType, 'TP=%d' % testTN, 'FP=%d' % testTP)
+    #print(modelType, 'TP=%d' % testTN, 'FP=%d' % testTP)
+    print('[%s TP=%d FP=%d]' % (modelType, testTN, testTP))
     #print(testResults, np.sum(testResults, axis=1))
     header = [
-        'target_recall'
+        'eval_recall'
     ]
     for e in evalList:
         header.append(e)
@@ -110,11 +118,12 @@ def createRocImage(modelType, rocStats, rocDir):
     plt.savefig(outFN)
     plt.close()
 
-def printClinicalModels(allStats, acceptedRecall, targetRecall):
+def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels):
     header = [
-        'variant_type', 'best_model', 'model_target',
+        'variant_type', 'best_model', 'model_eval',
         'CV_recall', 'final_recall', 'CV_FPR', 'final_FPR'
     ]
+    print('[clinical_model min=%0.4f tar=%0.4f]' % (acceptedRecall, targetRecall))
     print(*header, sep='\t')
     for k in sorted(allStats.keys()):
         stats = allStats[k]
@@ -168,6 +177,9 @@ def printClinicalModels(allStats, acceptedRecall, targetRecall):
             #this is the unfortunate event that NO model passes 
             print(reformKey, 'None', 'None', '--', '--', '--', '--', sep='\t')
         else:
+            clf = allModels[k][bestModelName]['MODEL']
+            coreFeatureNames = [tuple(f.split('-')) for f in allModels[k][bestModelName]['FEATURES']]
+            
             modelTargetRecall = bestModelTargetRecall
             evalList = [bestModelName]
             rowVals = [
@@ -178,11 +190,14 @@ def printClinicalModels(allStats, acceptedRecall, targetRecall):
                 '%0.4f' % bestFPR
             ]
             print(*rowVals, sep='\t')
+            #TODO: if you want to explore this, need to import the eli5 (costly, so should make an option)
+            #import eli5
+            #print(eli5.formatters.text.format_as_text(eli5.explain_weights(clf, feature_names=[str(cfn) for cfn in coreFeatureNames])))
     
 
 if __name__ == "__main__":
     #first set up the arg parser
-    DESC="Script for evaluating variants for false positive status"
+    DESC="Script for summarizing training performance"
     p = ap.ArgumentParser(description=DESC, formatter_class=ap.RawTextHelpFormatter)
     
     #optional arguments with default

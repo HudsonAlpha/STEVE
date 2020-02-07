@@ -11,6 +11,8 @@ DATA_DIRECTORY = '/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/
 PIPELINE_DIRECTORY = '%s/pipeline' % REPO_DIRECTORY
 EXTRACT_SCRIPT = '%s/scripts/ExtractFeatures.py' % REPO_DIRECTORY
 TRAINING_SCRIPT = '%s/scripts/TrainModels.py' % REPO_DIRECTORY
+DATA_REPORT_SCRIPT = '%s/scripts/PrintDataReport.py' % REPO_DIRECTORY
+MODEL_REPORT_SCRIPT = '%s/scripts/PrintModelReport.py' % REPO_DIRECTORY
 
 ALIGNERS = [
     'bwa-mem-0.7.17-BQSR',
@@ -43,9 +45,45 @@ def getTrainedModels():
 
     return ret
 
+def getModelSummaries():
+    '''
+    This will return a list of model summaries we expect at this end of this
+    '''
+    ret = []
+    for al in ALIGNERS:
+        for vc in VARIANT_CALLERS:
+            ret.append('%s/model_summaries/%s/%s/model_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
+    
+    for al, vc in FULL_PIPES:
+        ret.append('%s/model_summaries/%s/%s/model_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
+
+    return ret
+
+def getDataStats():
+    '''
+    This will return a list of data stat files we expect at the end of this
+    '''
+    ret = []
+    for al in ALIGNERS:
+        for vc in VARIANT_CALLERS:
+            ret.append('%s/feature_stats/%s/%s/feature_stats.tsv' % (PIPELINE_DIRECTORY, al, vc))
+    
+    for al, vc in FULL_PIPES:
+        ret.append('%s/feature_stats/%s/%s/feature_stats.tsv' % (PIPELINE_DIRECTORY, al, vc))
+
+    return ret
+
 rule train_models:
     input:
         *getTrainedModels()
+
+rule summarize_models:
+    input:
+        *getModelSummaries()
+
+rule data_stats:
+    input:
+        *getDataStats()
 
 ##############################################################################################
 #FEATURE EXTRACTION
@@ -121,4 +159,44 @@ rule TrainModels:
             {params.feature_dir} \
             {params.slids} \
             {params.output_prefix}
+        '''
+
+##############################################################################################
+#Statistics gathering
+##############################################################################################
+
+rule SummarizeFeatures:
+    input:
+        features=getFeatureFiles
+    output:
+        summary="{pipeline_dir}/feature_stats/{aligner}/{caller}/feature_stats.tsv"
+    params:
+        script=DATA_REPORT_SCRIPT,
+        prefix="{pipeline_dir}/features/{aligner}/{caller}"
+    log: "{pipeline_dir}/logs/feature_stats/{aligner}/{caller}.log"
+    threads: 1
+    shell:
+        '''
+        python3 -u {params.script} \
+            {params.prefix} > \
+            {output.summary}
+        '''
+
+rule SummarizeModels:
+    input:
+        models="{pipeline_dir}/trained_models/{aligner}/{caller}/models.p",
+        rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
+        stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"
+    output:
+        summary="{pipeline_dir}/model_summaries/{aligner}/{caller}/model_summary.tsv"
+    params:
+        script=MODEL_REPORT_SCRIPT,
+        prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+    log: "{pipeline_dir}/logs/model_summaries/{aligner}/{caller}.log"
+    threads: 1
+    shell:
+        '''
+        python3 -u {params.script} \
+            {params.prefix} > \
+            {output.summary}
         '''
