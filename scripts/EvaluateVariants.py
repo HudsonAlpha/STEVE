@@ -4,6 +4,7 @@ import csv
 import json
 import numpy as np
 import pickle
+import re
 import vcf
 
 from ExtractFeatures import ALL_METRICS, getVariantFeatures, GT_TRANSLATE, VAR_TRANSLATE
@@ -226,7 +227,7 @@ def runSubType(variantType, args, stats, models, statKey):
     #load the variant list
     allVariants = []
     if args.variants != None:
-        raise Exception('No impl')
+        allVariants += parseCLIVariants(args.variants)
     
     if args.codicem != None:
         allVariants += loadCodicemVariants(args.codicem)
@@ -359,7 +360,7 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
     #load the variant list
     allVariants = []
     if args.variants != None:
-        raise Exception('No impl')
+        allVariants += parseCLIVariants(args.variants)
     
     if args.codicem != None:
         allVariants += loadCodicemVariants(args.codicem)
@@ -472,6 +473,31 @@ def loadModels(modelDir):
     fp.close()
 
     return (stats, models)
+
+def parseCLIVariants(csVar):
+    '''
+    This will parse command line coordinates and return variants
+    @param csVar - a comma-separated list of variants of form (chr:start-end)
+    @return - a list of variants to evaluate
+    '''
+    ret = []
+    coords = csVar.split(',')
+    for coorStr in coords:
+        parsed = re.split('[\-:]+', coorStr)
+        if len(parsed) == 2:
+            chrom = parsed[0]
+            start = int(parsed[1])-1 #0-base it
+            end = start+1
+        elif len(parsed) == 3:
+            chrom = parsed[0]
+            start = int(parsed[1])-1 #0-base it
+            end = int(parsed[2])
+        else:
+            raise Exception('Unexpected coordinates string: "%s"' % coorStr)
+        var = (chrom, start, end, '--', '--')
+        if (var not in ret):
+            ret.append(var)
+    return ret
 
 def loadCodicemVariants(csvFN):
     '''
