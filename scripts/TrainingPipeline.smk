@@ -2,10 +2,7 @@
 import os
 
 from RunTrainingPipeline import parseSlids
-
-#Constants for the validated pipeline
-REPO_DIRECTORY = '/gpfs/gpfs1/home/jholt/sanger_less_tests'
-DATA_DIRECTORY = '/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/pipeline'
+from PipelineConfig import DATA_DIRECTORY, REPO_DIRECTORY
 
 #derived from repo 
 PIPELINE_DIRECTORY = '%s/pipeline' % REPO_DIRECTORY

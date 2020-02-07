@@ -7,6 +7,7 @@ import os
 import re
 import vcf
 
+from PipelineConfig import DATA_DIRECTORY, REPO_DIRECTORY
 from RunTrainingPipeline import parseSlids
 
 #Missing value
@@ -33,7 +34,7 @@ VAR_TRANSLATE = {
 }
 
 #this file contains all the metrics we care about for each variant caller
-METRICS_FN = '/gpfs/gpfs1/home/jholt/sanger_less_tests/scripts/model_metrics.json'
+METRICS_FN = '%s/scripts/model_metrics.json' % REPO_DIRECTORY
 fp = open(METRICS_FN, 'r')
 UNPARSED_METRICS = json.load(fp)
 fp.close()
@@ -241,9 +242,8 @@ def gatherVcfMetrics(vcfFN, rawVCF, metrics):
 
 def extractFeatures(aligner, caller, samples, outPrefix):
     #0 - constants based on input
-    RTG_ROOT = '/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/pipeline/rtg_results/%s/%s' % (aligner, caller)
-    VCF_ROOT = '/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/pipeline/variant_calls/%s/%s' % (aligner, caller)
-    #OUTPUT_ROOT = '/gpfs/gpfs1/home/jholt/sanger_less_tests/results/rtgReformed'
+    RTG_ROOT = '%s/rtg_results/%s/%s' % (DATA_DIRECTORY, aligner, caller)
+    VCF_ROOT = '%s/variant_calls/%s/%s' % (DATA_DIRECTORY, aligner, caller)
     OUTPUT_ROOT = outPrefix
     CLASSIFICATION_TYPES = ['fp', 'tp']
     VCF_METRICS = ALL_METRICS[caller]

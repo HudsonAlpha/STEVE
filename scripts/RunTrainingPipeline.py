@@ -7,10 +7,13 @@ import os
 import requests
 import subprocess
 
+from PipelineConfig import ENABLE_SLACK_NOTIFICATIONS, ENABLED_SLACK_CHANNEL, ENABLED_SLACK_URLS
+
 #disable by setting to None
-#SLACK_CHANNEL = None
-#SLACK_CHANNEL = "#csl-pipeline"
-SLACK_CHANNEL = "@holtjma"
+if ENABLE_SLACK_NOTIFICATIONS:
+    SLACK_CHANNEL = ENABLED_SLACK_CHANNEL
+else:
+    SLACK_CHANNEL = None
 
 SNAKEFILE_PATH = os.path.dirname(os.path.realpath(__file__))+'/TrainingPipeline.smk'
 SNAKEMAKE_CLUSTER_CONFIG = os.path.dirname(os.path.realpath(__file__))+'/cluster.json'
@@ -61,8 +64,7 @@ def sendSlackMessage(channel, message):
     @param channel - the channel to send output to
     @param message - a string indicating what should be sent to the channel
     '''
-    urlJson = '/gpfs/gpfs1/home/jholt/slack_integration/data/slack_urls.json'
-    fp = open(urlJson, 'r')
+    fp = open(ENABLED_SLACK_URLS, 'r')
     j = json.load(fp)
     fp.close()
     
@@ -89,7 +91,6 @@ def sendSlackMessage(channel, message):
 if __name__ == "__main__":
     #first set up the arg parser
     DESC="Wrapper script for running the pipelines"
-    DEFAULT_JSON = '/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/scripts/sample_metadata.json'
     p = ap.ArgumentParser(description=DESC, formatter_class=ap.RawTextHelpFormatter)
     
     #optional arguments with default
