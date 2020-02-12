@@ -13,7 +13,7 @@ MODEL_REPORT_SCRIPT = '%s/scripts/PrintModelReport.py' % REPO_DIRECTORY
 
 ALIGNERS = [
     'bwa-mem-0.7.17-BQSR',
-    'sentieon-201808.07'
+    #'sentieon-201808.07'
 ]
 VARIANT_CALLERS = [
     'strelka-2.9.10'
