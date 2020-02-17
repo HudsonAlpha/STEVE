@@ -26,7 +26,7 @@ THREADS_PER_PROC = 16
 
 #parse the sample names for the next steps
 RAW_SLIDS = config['sampleData']
-SAMPLE_LIST = sorted(set(parseSlids(RAW_SLIDS)))
+SAMPLE_LIST = sorted(set(parseSlids(RAW_SLIDS))))
 
 def getTrainedModels():
     '''
@@ -50,9 +50,11 @@ def getModelSummaries():
     for al in ALIGNERS:
         for vc in VARIANT_CALLERS:
             ret.append('%s/model_summaries/%s/%s/model_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
+            ret.append('%s/model_summaries/%s/%s/strict_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
     
     for al, vc in FULL_PIPES:
         ret.append('%s/model_summaries/%s/%s/model_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
+        ret.append('%s/model_summaries/%s/%s/strict_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
 
     return ret
 
@@ -196,6 +198,27 @@ rule SummarizeModels:
         '''
         python3 -u {params.script} \
             -r {output.images} \
+            {params.prefix} > \
+            {output.summary}
+        '''
+
+rule StrictSummarizeModels:
+    input:
+        models="{pipeline_dir}/trained_models/{aligner}/{caller}/models.p",
+        rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
+        stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"
+    output:
+        summary="{pipeline_dir}/model_summaries/{aligner}/{caller}/strict_summary.tsv"
+    params:
+        script=MODEL_REPORT_SCRIPT,
+        prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+    log: "{pipeline_dir}/logs/model_summaries/{aligner}/{caller}.log"
+    threads: 1
+    shell:
+        '''
+        python3 -u {params.script} \
+            -m 0.999 \
+            -t 1.0 \
             {params.prefix} > \
             {output.summary}
         '''
