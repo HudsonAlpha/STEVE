@@ -46,12 +46,14 @@ def getModelResults(aligner, caller):
 
     #get all the training results for this aligner/caller combo
     trainingResults = getTrainingResults(aligner, caller)
+    strictResults = getTrainingResults(aligner, caller, True)
 
     retDict = {
         'ALIGNER' : aligner,
         'CALLER' : caller,
         'RTG_RESULTS' : rtgResults,
-        'TRAINING_RESULTS' : trainingResults
+        'TRAINING_RESULTS' : trainingResults,
+        'STRICT_RESULTS' : strictResults
     }
     return retDict
 
@@ -165,15 +167,19 @@ def loadRtgSummary(fn):
         resultsDict[h] = val
     return resultsDict
 
-def getTrainingResults(aligner, caller):
+def getTrainingResults(aligner, caller, strict=False):
     '''
     This will retrieve training results for the specified aligner/caller combo
     @param aligner - the aligner specified
     @param caller - the caller specified
+    @param strict - if True, load the strict version of the results
     @return - a dictionary of metrics for this combo
     '''
     #pull the summary results and parse the clinical fragments
-    summaryFN = '%s/pipeline/model_summaries/%s/%s/model_summary.tsv' % (REPO_DIRECTORY, aligner, caller)
+    if not strict:
+        summaryFN = '%s/pipeline/model_summaries/%s/%s/model_summary.tsv' % (REPO_DIRECTORY, aligner, caller)
+    else:
+        summaryFN = '%s/pipeline/model_summaries/%s/%s/strict_summary.tsv' % (REPO_DIRECTORY, aligner, caller)
     clinicalResults = {}
     fp = open(summaryFN, 'r')
 
