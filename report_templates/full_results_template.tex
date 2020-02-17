@@ -117,6 +117,37 @@ Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_best_models} contains the selected mod
     \label{tab:{{ ALIGNER }}_{{ CALLER }}_best_models}
 \end{table}
 
+\subsubsection{Strict Models}
+Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_best_models} contains the strict models for aligner ``{{ ALIGNER_LABEL }}'' and caller ``{{ CALLER_LABEL }}'' given the minimum sensitivity, $S_m = {{ STRICT_RESULTS.CLINICAL_MINIMUM }}$, and the target sensitivity, $S_t = {{ STRICT_RESULTS.CLINICAL_TARGET }}$.  These models are labeled strict due to very high requirements, and the majority of models at different evaluation sensitivities fail to pass these criteria.  As a result, many variant/genotype combinations have no passing models or have models that are not practically useful (e.g. an FPR of 99\%).
+
+\begin{table}
+    \centering
+    \begin{tabular}{|l|l|r|r|r|r|r|}
+        \hline
+        {{ FORMAT.HEADER_COLOR }}
+        \textbf{Variant type}
+        {% for fk in FORMAT.MODEL_RESULTS_ORDER %}
+            {% if fk == 'best_model' %}
+                &{{ '\\textbf{'+FORMAT.MODEL_RESULTS.get(fk, {}).get('label', fk)+'}' }}
+            {% else %}
+                &{{ '\\rot{\\textbf{'+FORMAT.MODEL_RESULTS.get(fk, {}).get('label', fk)+'}}' }}
+            {% endif %}
+        {% endfor %}
+        \\ \hline
+        {% for vt in FORMAT.VARIANT_ORDER %}
+            {% for gt in FORMAT.CALL_ORDER %}
+                {{ vt+'-'+gt }}
+                {% for fk in FORMAT.MODEL_RESULTS_ORDER %}
+                    &{{ FORMAT.MODEL_RESULTS.get(fk, {}).get('format', FORMAT.MODEL_RESULTS['default']['format']).format(STRICT_RESULTS.CLINICAL_MODELS[vt+'_'+gt][fk]) }}
+                {% endfor %}
+                \\ \hline
+            {% endfor %}
+        {% endfor %}
+    \end{tabular}
+    \caption{Selected models for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', $S_m = {{ STRICT_RESULTS.CLINICAL_MINIMUM }}$, $S_t = {{ STRICT_RESULTS.CLINICAL_TARGET }}$. If no model passed the criteria, then the ``Best Model'' field will be ``None''. Evaluation sensitivity is the training sensitivity that was used to gather results for the remaining fields in testing. Results prefaced with ``CV'' represent the test results during cross-validation. Similarly, results prefaced with ``Final'' represent the results on the held-out testing set during final evaluation. Note that we required the models to have sensitivity requirements based on both the CV and Final results.  In contrast, FPR is not bound by any requirements, but is instead representative of the expected fraction of orthogonal confirmations required if the model is used.}
+    \label{tab:{{ ALIGNER }}_{{ CALLER }}_best_models}
+\end{table}
+
 {% for vt in FORMAT.VARIANT_ORDER %}
     {% for gt in FORMAT.CALL_ORDER %}
         \subsubsection{Model for {{vt}}-{{gt}}}
