@@ -27,12 +27,21 @@ def parseSlids(slidStr):
     '''
     ret = []
     if os.path.exists(slidStr):
-        #load a file with lines
-        fp = open(slidStr, 'rt')
-        frags = []
-        for l in fp:
-            frags.append(l.rstrip())
-        fp.close()
+        if slidStr.endswith('.json'):
+            #assume a dictionary where each key is a sample
+            fp = open(slidStr, 'r')
+            j = json.load(fp)
+            fp.close()
+            frags = []
+            for k in j.keys():
+                frags.append(k)
+        else:
+            #load a file with one sample number per line
+            fp = open(slidStr, 'rt')
+            frags = []
+            for l in fp:
+                frags.append(l.rstrip())
+            fp.close()
     else:
         #load as fragments
         frags = slidStr.split(',')
@@ -100,7 +109,7 @@ if __name__ == "__main__":
     p.add_argument('-x', '--execute', dest='execute', action='store_true', default=False, help='execute the commands (default: False)')
 
     #required main arguments
-    p.add_argument('slids', type=str, help='the list of slids separate by commas (ex: "SL123456-SL123467,SL333333")')
+    p.add_argument('slids', type=str, help='sample labels (.json, .txt, comma-separated entry)')
     
     #parse the arguments
     args = p.parse_args()
