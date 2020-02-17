@@ -1,0 +1,71 @@
+{
+    "HEADER_COLOR" : "\\rowcolor{blue!25}",
+    "TOTAL_COLOR" : "\\rowcolor{yellow}",
+    "VARIANT_ORDER" : ["SNV", "INDEL"],
+    "CALL_ORDER" : ["HET", "HOM", "HE2"],
+    "METADATA_ORDER" : [
+        "sample", "prep"
+    ],
+    "METADATA" : {
+        "default" : {
+            "format" : "{0}"
+        },
+        "sample" : {
+            "label" : "Sample"
+        },
+        "prep" : {
+            "label" : "Preparation"
+        }
+    },
+    "RTG_RESULTS_ORDER" : [
+        "True-pos-call", "False-pos", "Sensitivity", "Precision", "F-measure"
+    ],
+    "RTG_RESULTS" : {
+        "default" : {
+            "format" : "{}"
+        },
+        "Sensitivity" : {
+            "format" : "{:0.4f}"
+        },
+        "Precision" : {
+            "format" : "{:0.4f}"
+        },
+        "F-measure" : {
+            "format" : "{:0.4f}"
+        },
+        "True-pos-call" : {
+            "label" : "True Positives",
+            "format" : "{:,.0f}"
+        },
+        "False-pos" : {
+            "label" : "False Positives",
+            "format" : "{:,.0f}"
+        }
+    },
+    "MODEL_RESULTS_ORDER" : [
+        "best_model", "model_eval", "CV_recall", "final_recall", "CV_FPR", "final_FPR"
+    ],
+    "MODEL_RESULTS" : {
+        "default" : {
+            "format" : "{0}"
+        },
+        "best_model" : {
+            "label" : "Best Model"
+        },
+        "model_eval" : {
+            "label" : "Evaluation Sensitivity"
+        },
+        "CV_recall" : {
+            "label" : "CV Sensitivity"
+        },
+        "final_recall" : {
+            "label" : "Final Sensitivity"
+        },
+        "CV_FPR" : {
+            "label" : "CV FPR"
+        },
+        "final_FPR" : {
+            "label" : "Final FPR"
+        }
+    }
+}

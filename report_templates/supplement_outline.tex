@@ -1,0 +1,78 @@
+\documentclass{article}
+
+\usepackage{float}
+
+\usepackage[table]{xcolor} %supports coloring single cells in a table
+\usepackage{longtable} %gives multi-page tables
+\usepackage{makecell}
+
+\usepackage{hhline}
+\usepackage{hyperref}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{pdflscape}
+%\usepackage{url}
+
+%https://tex.stackexchange.com/questions/98388/how-to-make-table-with-rotated-table-headers-in-latex
+\usepackage{adjustbox}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{multirow}
+\newcolumntype{R}[2]{ 
+    >{\adjustbox{angle=#1,lap=\width-(#2)}\bgroup}%
+    c%
+    <{\egroup}%
+}
+\newcommand*\rot{\multicolumn{1}{R{90}{1em}|}}% no optional argument here, please!
+\newcommand*\rotf{\multicolumn{1}{|R{90}{1em}|}}% no optional argument here, please!
+\newcommand*\rotd{\multicolumn{1}{R{90}{1em}||}}
+
+\newcommand*{\ttrow}{
+  \global\let\rowfont\ttfamily
+  \ttfamily
+}
+\newcommand*{\unttrow}{
+  \global\let\rowfont\relax
+  \mdseries
+}
+\newcommand*{\rowfont}{}
+
+%used for creating code blocks for the command line invocations
+\usepackage{listings}
+\lstset{basicstyle=\ttfamily,
+  showstringspaces=false,
+  commentstyle=\color{red},
+  %keywordstyle=\color{blue}
+}
+
+\begin{document}
+
+\title{Supplemental Document}
+\author{J. Matthew Holt et al.}
+
+\maketitle
+\tableofcontents
+
+\newpage
+\input{{"{"}}{{ PREFIX+'_tex/metadata_template.tex' }}}
+
+\newpage
+\input{{"{"}}{{ PREFIX+'_tex/pipeline_template.tex' }}}
+
+\newpage
+\input{{"{"}}{{ PREFIX+'_tex/training_template.tex' }}}
+
+{% for aligner in ALIGNER_ORDER %}
+    {% for caller in sorted(PARSED_DATA[aligner].keys()) %}
+        \newpage
+        \input{{"{"}}{{ '{prefix}_tex/full_results_{aligner}_{caller}.tex'.format(prefix=PREFIX, aligner=aligner, caller=caller) }}}
+    {% endfor %}
+{% endfor %}
+
+%\input{{"{"}}{{ PREFIX+'_tex/metadata_outline.tex' }}}
+
+%\input{{"{"}}{{ PREFIX+'_tex/rtg_compare.tex' }}}
+
+%\input{{"{"}}{{ PREFIX+'_tex/truvari_compare.tex' }}}
+
+\end{document}

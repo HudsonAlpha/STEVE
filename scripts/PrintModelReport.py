@@ -108,15 +108,15 @@ def createRocImage(modelType, rocStats, rocDir):
 
     plt.title(modelType)
     plt.xlabel('FPR')
-    plt.ylabel('TPR / recall')
+    plt.ylabel('TPR / sensitivity')
     plt.xlim([0.0000, 1.0000])
     plt.ylim([0.9900, 1.0000])
-    #plt.ylim([0.0000, 1.0000])
     plt.axhline(0.9950, color='red', linestyle='--')
     plt.legend()
     plt.grid()
     plt.savefig(outFN)
     plt.close()
+    return outFN
 
 def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels):
     header = [

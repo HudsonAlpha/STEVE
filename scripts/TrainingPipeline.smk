@@ -185,7 +185,8 @@ rule SummarizeModels:
         rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
         stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"
     output:
-        summary="{pipeline_dir}/model_summaries/{aligner}/{caller}/model_summary.tsv"
+        summary="{pipeline_dir}/model_summaries/{aligner}/{caller}/model_summary.tsv",
+        images=directory("{pipeline_dir}/model_summaries/{aligner}/{caller}/roc_curves")
     params:
         script=MODEL_REPORT_SCRIPT,
         prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
@@ -194,6 +195,7 @@ rule SummarizeModels:
     shell:
         '''
         python3 -u {params.script} \
+            -r {output.images} \
             {params.prefix} > \
             {output.summary}
         '''

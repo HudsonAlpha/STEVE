@@ -1,0 +1,154 @@
+\section{Genome Sequencing Pipelines}
+\subsection{Dragen Pipeline}
+Illumina's DRAGEN platform is a rapid genome analysis platform that performs both alignment and variant calling steps using hardware acceleration.  The details of this platform can be found on \href{https://www.illumina.com/products/by-type/informatics-products/dragen-bio-it-platform.html}{Illumina's DRAGEN webpage}.
+
+\subsubsection{Integrated Command}
+Because the Dragen solution is fully integrated from FASTQ to gVCF, there is only one command we used to collect the final gVCFs.  The final result of this step is the hard-filtered gVCF file (and corresponding index file) of the format \texttt{\$\{sample\}.hard-filtered.gvcf.gz}.  That gVCF file is given to RTG VCFeval for variant evaluation.
+
+%\begin{lstlisting}[language=bash,caption={bash version}]
+\begin{lstlisting}[language=bash]
+dragen -f \
+    -r /staging/reference/hg38/hg38.fa.k_21.f_16.m_149 \
+    --fastq-list /staging/fastq/${sample}_fastqs/${sample}_list.csv \
+    --bin_memory 60000000000 \
+    --output-directory /staging/bam/ \
+    --output-file-prefix ${sample} \
+    --enable-duplicate-marking true \
+    --enable-map-align-output true \
+    --enable-variant-caller true \
+    --vc-sample-name ${sample} \
+    --vc-emit-ref-confidence GVCF \
+    --dbsnp /staging/reference/hg38/dbsnp_146.hg38.vcf
+\end{lstlisting}
+
+\subsection{Sentieon / Strelka2 Pipeline}
+This pipeline uses a combination of Sentieon (more efficient implementation of BWA-mem) for alignment and Strelka2 for variant calling. The pipeline is implemented using a snakemake workflow, and relevent commands are presented in order below.  All parameters referring to a reference genome are using the hg38 reference genome with ALT contigs.
+
+\subsubsection{Sentieon paired-end alignment}
+The following command is used on each pair of FASTQ files for a sample.  In brief, it performs the alignment process using sentieon, passes that into the post-alt alignment process derived from \href{https://github.com/lh3/bwa/blob/master/README-alt.md}{bwa-kit} (this is recommended due to ALT contigs in the hg38 reference), and finally used the sention sorting function.  The output of this command is a single, position-sorted BAM file that has been post-alt processed and the corresponding index file.
+
+\begin{lstlisting}[language=bash]
+sentieon \
+    bwa mem -M \
+    -R "{params.rgoptions}" \
+    -t {threads} \
+    -K 10000000 \
+    {params.reference} \
+    {input.fq1} {input.fq2} | \
+{params.bwakit}/k8 \
+    {params.bwakit}/bwa-postalt.js \
+    {params.reference}.alt | \
+sentieon util sort {params.tempParams} \
+    --bam_compression 1 \
+    -r {params.reference} \
+    -o {output.bam} \
+    -t {threads} \
+    --sam2bam \
+    -i -
+\end{lstlisting}
+
+\subsubsection{Sentieon deduplication}
+The following command will gather duplication statistics across \textbf{ALL} BAM files for a sample and then simultaneously remove duplicates while merging the BAM files together.  The output of this step is a single BAM file containing all alignments for the sample and the corresponding index file.
+
+\noindent\textbf{Parameters:}
+\begin{enumerate}
+    \item sortedbams - this is a concatenation of \texttt{-i BAM} for each BAM file in the sample
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+sentieon driver \
+    -t {threads} \
+    {params.sortedbams} \
+    --algo LocusCollector \
+    --fun score_info \
+    {output.score} && \
+sentieon driver {params.tempParams} \
+    -t {threads} \
+    {params.sortedbams} \
+    --algo Dedup \
+    --rmdup \
+    --score_info {output.score} \
+    --metrics {output.metrics} \
+    --bam_compression 1 \
+    {output.dedupbam}
+\end{lstlisting}
+
+\subsubsection{Sentieon Base Quality Recalibration}
+The following command will gather base quality score information for the de-duplicated sample BAM file and then perform base quality score recalibration (BQSR) on the BAM.  The output of this step is a single BAM file containing the recalibrated mappings for the sample and the corresponding index file.  This is the final BAM file for the sample.
+
+\noindent\textbf{Parameters:}
+\begin{enumerate}
+    \item dbsnp - this is the dbSNP file gathered from this URL: \url{ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/hg38/dbsnp_146.hg38.vcf.gz}
+    \item mills - the is the Mills indel file gathered from this URL: \url{ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/hg38/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz}
+    \item tempParams - a temporary directory, can be removed without altering command outputs
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+sentieon driver \
+    -r {params.reference} \
+    -t {threads} \
+    -i {input.dedupbam} \
+    --algo QualCal \
+    -k {params.dbsnp} \
+    -k {params.mills} \
+    {output.recaltable} && \
+sentieon driver {params.tempParams} \
+    -r {params.reference} \
+    -t {threads} \
+    -i {input.dedupbam} \
+    -q {output.recaltable} \
+    --algo ReadWriter \
+    {output.recalbam}
+\end{lstlisting}
+
+\subsubsection{Strelka2 Variant Calling}
+The following command will execute the Strelka2 workflow to perform variant calling.  As an additional step, we annotate the final VCF file from Strelka2 with dbSNP identifiers (this is primarily for QC purposes in the pipeline).  The final result of this step is a VCF file with dbSNP identifiers and the corresponding index file.  This is the final VCF file that is provided as input to RTG VCFeval.
+
+\noindent\textbf{Parameters:}
+\begin{enumerate}
+    \item contigs - this is a restricted contig file (BED format) to reduce run time of Strelka2, see README file at \url{https://github.com/Illumina/strelka/blob/v2.9.x/docs/userGuide/README.md#improving-runtime-for-references-with-many-short-contigs-such-as-grch38} for the exact file.
+    \item memGB - a memory limit for strelka2
+    \item bcftools - path to a \href{http://samtools.github.io/bcftools/bcftools.html}{bcftools} executable for performing annotation; the version used was 1.10.2
+    \item dbsnp - this is the dbSNP file gathered from this URL: \url{ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/hg38/dbsnp_146.hg38.vcf.gz}
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+{params.strelka}/bin/configureStrelkaGermlineWorkflow.py \
+    --bam {input.bam} \
+    --referenceFasta {params.reference} \
+    --callRegions {params.contigs} \
+    --runDir {output.runDir} && \
+{output.runDir}/runWorkflow.py \
+    -m local \
+    -j {threads} \
+    -g {params.memGB} && \
+{params.bcftools} annotate \
+    -a {params.dbsnp} \
+    -c ID \
+    -O z \
+    -o {output.vcf} \
+    {output.runDir}/results/variants/variants.vcf.gz && \
+tabix {output.vcf}
+\end{lstlisting}
+
+\subsection{RTG VCFeval Analysis}
+\label{sec:rtg_vcfeval}
+This tool was used to label variant calls as either true or false positives depending on presence or absence from the corresponding GIAB truth set. Note that these variants are limited to those found within the GIAB high-confidence regions (i.e. variants outside those regions are excluded).
+
+\noindent\textbf{Parameters:}
+\begin{enumerate}
+    \item truth - this is the VCF of variants published by GIAB representing a sample's truth set
+    \item bed - this is the high-confidence regions published by GIAB for the truth set; variants outside these regions are NOT evaluated
+    \item sdf - a file format required by RTG VCFeval (build from the hg38 reference)
+\end{enumerate}
+
+\begin{lstlisting}[language=bash]
+rtg vcfeval \
+    --all-records \
+    -b {params.truth} \
+    -c {input.vcf} \
+    --bed-regions {params.bed} \
+    -t {params.sdf} \
+    -T {threads} \
+    -o {output.rtgDir}
+\end{lstlisting}

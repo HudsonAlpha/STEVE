@@ -1,0 +1,135 @@
+{{ '\\section{{Results for {aligner}/{caller}}}'.format(aligner=ALIGNER_LABEL, caller=CALLER_LABEL) }}
+The following sections denote results that are specific the the pipeline consisting of aligner ``{{ ALIGNER_LABEL }}" and variant caller ``{{ CALLER_LABEL }}".
+
+\subsection{RTG VCFeval Results}
+The following sections contain results as reported by \texttt{rtg vcfeval}. For information on how \texttt{rtg vcfeval} was invoked, refer to Section \ref{sec:rtg_vcfeval}.
+
+\subsubsection{Pipeline Performance}
+Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_rtg_summary} contains the results from the RTG VCFeval \texttt{summary.txt} file that primarily contains summary information regarding the evaluated VCF file. We copied the results from this summary (unfiltered ``None'' row) and calculated summary mean and standard deviation as well.
+
+Sensitivity is the fraction of annotated true positives that were correctly identified by the pipeline, precision is the fraction of called variants that were part of the truth set, and F-measure is the harmonic mean of sensitivy and precision. A perfect caller would have 1.0000 for all scores.
+
+\begin{table}
+    \centering
+    \begin{tabular}{|l|r|r|r|r|r|}
+        \hline
+        {{ FORMAT.HEADER_COLOR }}\textbf{Sample}
+        {% for fk in FORMAT.RTG_RESULTS_ORDER %}
+            &{{ '\\textbf{'+FORMAT.RTG_RESULTS.get(fk, {}).get('label', fk)+'}' }}
+        {% endfor %}
+        \\ \hline
+        {% set final_sample = sorted(RTG_RESULTS.SAMPLE_SUMMARY.keys())[-1] %}
+        {% for sample in sorted(RTG_RESULTS.SAMPLE_SUMMARY.keys()) %}
+            {{ sample }}
+            {% for fk in FORMAT.RTG_RESULTS_ORDER %}
+                &{{ FORMAT.RTG_RESULTS.get(fk, {}).get('format', FORMAT.RTG_RESULTS['default']['format']).format(RTG_RESULTS.SAMPLE_SUMMARY[sample][fk]) }}
+            {% endfor %}
+            {% if sample != final_sample %}
+                \\ \hline
+            {% else %}
+                \\ \hhline{|=|=|=|=|=|=|}
+            {% endif %}
+        {% endfor %}
+        {{ FORMAT.TOTAL_COLOR }} Mean$\pm$Stdev
+        {% for fk in FORMAT.RTG_RESULTS_ORDER %}
+            {% set formatting = FORMAT.RTG_RESULTS.get(fk, {}).get('format', FORMAT.RTG_RESULTS['default']['format']) %}
+            &{{ (formatting+'$\\pm$'+formatting).format(RTG_RESULTS.TOTAL_SUMMARY[fk]['MEAN'], RTG_RESULTS.TOTAL_SUMMARY[fk]['STDEV']) }}
+        {% endfor %}
+        \\ \hline
+    \end{tabular}
+    \caption{Summary metrics from RTG VCFeval for aligner ``{{ ALIGNER_LABEL }}'' and variant caller ``{{ CALLER_LABEL }}''.}
+    \label{tab:{{ ALIGNER }}_{{ CALLER }}_rtg_summary}
+\end{table}
+
+\subsubsection{Variant Counts}
+Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_variants} contains a summary of the number of false and true positive variant calls after stratifying the results by variant type and genotype.
+
+\begin{table}
+    \centering
+    \begin{tabular}{|l|l|r|r|r|r|r|r|r|}
+        \hline
+        {{ FORMAT.HEADER_COLOR }}\textbf{Sample}&
+        \rot{\textbf{RTG Result}}
+        {% for vt in FORMAT.VARIANT_ORDER %}
+            {% for ct in FORMAT.CALL_ORDER %}
+                &{{ '\\rot{{\\textbf{{{vt}-{ct}}}}}'.format(vt=vt, ct=ct) }}
+            {% endfor %}
+        {% endfor %}
+        &\rot{\textbf{Total Calls}}
+        \\ \hline
+        {% for at in ['FP', 'TP'] %}
+            {% for sample in sorted(RTG_RESULTS.FEATURES.keys()) %}
+                {% if sample == 'total' %}
+                    {{ FORMAT.TOTAL_COLOR }}Total
+                {% else %}
+                    {{ sample }}
+                {% endif %}
+                &{{ at }}
+                {% for vt in FORMAT.VARIANT_ORDER %}
+                    {% for ct in FORMAT.CALL_ORDER %}
+                        &{{ '{0:,}'.format(RTG_RESULTS['FEATURES'][sample][vt][ct][at]) }}
+                    {% endfor %}
+                {% endfor %}
+                &{{ '{0:,}'.format(RTG_RESULTS['FEATURES'][sample]['sum'][at]) }}
+                {% if at == 'FP' and sample == 'total' %}
+                    \\ \hhline{|=|=|=|=|=|=|=|=|=|}
+                {% else %}
+                    \\ \hline
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+    \end{tabular}
+    \caption{This table shows the number of false and true positive variants calls as reported by \texttt{rtg vcfeval} for the aligner {{ ALIGNER_LABEL }} and variant caller {{ CALLER_LABEL }}. The variants are further divided by variant type (SNV or INDEL) and genotype (HET=heterozygous, HOM=homozygous, HE2=complex heterozygous).  The ``total'' label refers to the sum of all samples for the corresponding ``RTG Result'' type.}
+    \label{tab:{{ ALIGNER }}_{{ CALLER }}_variants}
+\end{table}
+
+\subsection{Model Results}
+The following sections contain results specific to the final trained models.
+
+\subsubsection{Selected Models}
+Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_best_models} contains the selected models for aligner ``{{ ALIGNER_LABEL }}'' and caller ``{{ CALLER_LABEL }}'' given the minimum sensitivity, $S_m = {{ TRAINING_RESULTS.CLINICAL_MINIMUM }}$, and the target sensitivity, $S_t = {{ TRAINING_RESULTS.CLINICAL_TARGET }}$.
+
+\begin{table}
+    \centering
+    \begin{tabular}{|l|l|r|r|r|r|r|}
+        \hline
+        {{ FORMAT.HEADER_COLOR }}
+        \textbf{Variant type}
+        {% for fk in FORMAT.MODEL_RESULTS_ORDER %}
+            {% if fk == 'best_model' %}
+                &{{ '\\textbf{'+FORMAT.MODEL_RESULTS.get(fk, {}).get('label', fk)+'}' }}
+            {% else %}
+                &{{ '\\rot{\\textbf{'+FORMAT.MODEL_RESULTS.get(fk, {}).get('label', fk)+'}}' }}
+            {% endif %}
+        {% endfor %}
+        \\ \hline
+        {% for vt in FORMAT.VARIANT_ORDER %}
+            {% for gt in FORMAT.CALL_ORDER %}
+                {{ vt+'-'+gt }}
+                {% for fk in FORMAT.MODEL_RESULTS_ORDER %}
+                    &{{ FORMAT.MODEL_RESULTS.get(fk, {}).get('format', FORMAT.MODEL_RESULTS['default']['format']).format(TRAINING_RESULTS.CLINICAL_MODELS[vt+'_'+gt][fk]) }}
+                {% endfor %}
+                \\ \hline
+            {% endfor %}
+        {% endfor %}
+    \end{tabular}
+    \caption{Selected models for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', $S_m = {{ TRAINING_RESULTS.CLINICAL_MINIMUM }}$, $S_t = {{ TRAINING_RESULTS.CLINICAL_TARGET }}$. If no model passed the criteria, then the ``Best Model'' field will be ``None''. Evaluation sensitivity is the training sensitivity that was used to gather results for the remaining fields in testing. Results prefaced with ``CV'' represent the test results during cross-validation. Similarly, results prefaced with ``Final'' represent the results on the held-out testing set during final evaluation. Note that we required the models to have sensitivity requirements based on both the CV and Final results.  In contrast, FPR is not bound by any requirements, but is instead representative of the expected fraction of orthogonal confirmations required if the model is used.}
+    \label{tab:{{ ALIGNER }}_{{ CALLER }}_best_models}
+\end{table}
+
+{% for vt in FORMAT.VARIANT_ORDER %}
+    {% for gt in FORMAT.CALL_ORDER %}
+        \subsubsection{Model for {{vt}}-{{gt}}}
+        {% if TRAINING_RESULTS.IMAGE_FILENAMES[vt+'_'+gt] != 'NO_IMAGE_FOUND' %}
+            Figure \ref{fig:{{ ALIGNER }}_{{ CALLER }}_{{ vt }}_{{ gt }}} contains the receiver-operator curves (ROC) for the final trained models for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', variant type ``{{ vt }}'', and genotype ``{{ gt }}''.
+            \begin{figure}[H]
+                \centering
+                \includegraphics[width=0.65\linewidth]{{"{"}}{{ TRAINING_RESULTS.IMAGE_FILENAMES[vt+'_'+gt] }}}
+                \caption{ROC curve for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', variant type ``{{ vt }}'', and genotype ``{{ gt }}''.  Note that these curves are zoomed in to focus on only the region greater than the minimum clinical sensitivity (0.99).}
+                \label{fig:{{ ALIGNER }}_{{ CALLER }}_{{ vt }}_{{ gt }}}
+            \end{figure}
+        {% else %}
+            No image found, try re-running the pipeline with the \texttt{-s} option to produce summary images.
+        {% endif %}
+    {% endfor %}
+{% endfor %}

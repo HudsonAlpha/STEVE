@@ -1,0 +1,98 @@
+\section{Model-Training Pipeline}
+This section contains details related to the methodology used for training all models.  Note: an identical process is used for each pipeline, allowing for different configuration of inputs depending on the upstream pipeline.
+
+\subsection{Feature Extraction}
+While an identical process is used for each pipeline, the features from each pipeline are configurable using a combination of JSON and hard-coded Python3 (when complex features are involved).  Features must be numerical values when given to the models, so some transformations are necessary from the raw VCF specified values.
+
+In the file \texttt{\{REPO\}/scripts/model\_metrics.json}, there are a list of features defined for different upstream callers. When a feature is practically copied from a VCF file, we try to denote it below with the corresponding VCF tag.  Here is a brief description of the sub-types and features (Note: not all types are used in each pipeline):
+
+\begin{enumerate}
+    \item ``CALL'' - These features are generally tied to a genotype call (i.e. sample-specific)
+    \begin{enumerate}
+        \item AD0 - the allele depth (AD) for the first allele in the genotype (e.g. if GT=0/1, this is the depth of the reference allele)
+        \item AD1 - the allele depth (AD) for the second allele in the genotype (e.g. if GT=0/1, this is the depth of the first alternate allele)
+        \item ADO - the total allele depth (AD) for any alleles that are not present in the genotype call
+        \item AF0 - the allele frequency for the first allele in the genotype (e.g. if GT=0/1 and AD=10,30 then this value is 0.25)
+        \item AF1 - the allele frequency for the second allele in the genotype (e.g. if GT=0/1 and AD=10,30 then this value is 0.75)
+        \item AFO - the total allele frequency for any alleles that are not present in the genotype call
+        \item GT - the genotype field (GT) transformed into a single numerical value
+        \item DP - the depth field (DP)
+        \item GQ - the genotype quality (GQ) field
+        \item DPI - the indel read depth (DPI)
+        \item GQX - empirically calibrated genotype quality score (GQX)
+        \item DPF - basecalls filtered prior to genotyping (DPF)
+        \item SB - sample site strand bias (SB)
+    \end{enumerate}
+    \item ``INFO'' - These features are generally tied to a variant site and may represent aggregate quality statistics in multi-sample VCF files (i.e. variant-specific metrics)
+    \begin{enumerate}
+        \item DB - represents dbSNP membership (DB)
+        \item FractionInformativeReads - fraction of informative reads out of the total reads (FractionInformativeReads)
+        \item FS - Phred-scaled Fisher's Exact Test for strand bias (FS)
+        \item MQ - mapping quality (MQ)
+        \item MQRankSum - rank sum test for mapping qualities (MQRankSum)
+        \item QD - variant confidence by depth (QD)
+        \item R2\_5P\_bias - score based on mate bias and distance from 5-prime end (R2\_5P\_bias)
+        \item ReadPosRankSum - measure of position bias (ReadPosRankSum)
+        \item SOR - measure of strand bias using contingency table (SOR)
+        \item SNVHPOL - SNV context homopolymer length (SNVHPOL)
+    \end{enumerate}
+    \item ``MUNGED'' - These features are generally calculated from information present in the VCF files that does not cleanly fall into either the INFO or CALL feature types
+    \begin{enumerate}
+        \item DP\_DP - ratio of call depth over total variant depth (generally 1.0 for single-sample VCFs)
+        \item QUAL - the quality value in the VCF (QUAL)
+        \item NEARBY - the number of non-reference variant calls near the current variant ($\pm$20bp)
+        \item FILTER - the number of non-PASS filter values in the FILTER field of the VCF
+        \item ID - set to True (i.e. 1) if the ID field is not empty, otherwise False (i.e. 0)
+    \end{enumerate}
+\end{enumerate}
+
+\subsection{Model Hyperparameters}
+During cross-validation, the models are given a selection of hyperparameters (i.e. parameters that define how the models are built) to choose from to identify the ``best'' combination of hyperparameters for the particular dataset. We selected a handful of hyperparameters based on the recommendations provided by \texttt{sklearn}, \texttt{imblearn}, and/or the corresponding literature for the models.  We then applied \texttt{sklearn}'s \texttt{GridSearchSV} method which systematically tests every possible combination of hyperparameters of those provided.  Only the best hyperparameters are then used for the final training and testing.
+
+Table \ref{tab:hyperparameters} reproduces the list of hyperparameters that were initially tested.  Note that this list is not exhaustive, but is intended to represent the most impactful hyperparameters. Additionally, this list of hyperparameters is statically entered into this document, but it is subject to change with new versions and is best found embedded within the source code in file \texttt{\{REPO\}/scripts/TrainModels.py}.
+
+\begin{longtable}{|>{\rowfont}l|>{\rowfont}l|>{\rowfont}l<{\unttrow}|}
+    \hline
+    {{ FORMAT.HEADER_COLOR }}\textbf{Model}&
+    \textbf{Hyperparameter}&
+    \textbf{Search Space}\\ \hline
+    \endhead
+
+    %\ttrow is a bit of a dirty hack, but the figure looks like i want so *shrug*
+    \ttrow \multirow{6}{0.30\linewidth}{RandomForestClassifier (sklearn)}&random\_state&[0]\\ \cline{2-3}
+    \ttrow&class\_weight&[`balanced']\\ \cline{2-3}
+    \ttrow&n\_estimators&[100, 200]\\ \cline{2-3}
+    \ttrow&max\_depth&[3, 4]\\ \cline{2-3}
+    \ttrow&min\_samples\_split&[2]\\ \cline{2-3}
+    \ttrow&max\_features&[`sqrt']\\ \hline
+    
+    \ttrow \multirow{5}{0.30\linewidth}{AdaBoostClassifier (sklearn)}&random\_state&[0]\\ \cline{2-3}
+    \ttrow&base\_estimator&[DecisionTreeClassifier(max\_depth=2)]\\ \cline{2-3}
+    \ttrow&n\_estimators&[100, 200]\\ \cline{2-3}
+    \ttrow&learning\_rate&[0.01, 0.1, 1.0]\\ \cline{2-3}
+    \ttrow&algorithm&[`SAMME', `SAMME.R']\\ \hline
+
+    \ttrow \multirow{6}{0.30\linewidth}{GradientBoostingClassifier (sklearn)}&random\_state&[0]\\ \cline{2-3}
+    \ttrow&n\_estimators&[100, 200]\\ \cline{2-3}
+    \ttrow&max\_depth&[3, 4]\\ \cline{2-3}
+    \ttrow&learning\_rate&[0.05, 0.1, 0.2]\\ \cline{2-3}
+    \ttrow&loss&[`deviance', `exponential']\\ \cline{2-3}
+    \ttrow&max\_features&[`sqrt']\\ \hline
+
+    \ttrow \multirow{2}{0.30\linewidth}{EasyEnsembleClassifier (imblearn)}&random\_state&[0]\\ \cline{2-3}
+    \ttrow&n\_estimators&[10, 20, 30, 40, 50]\\ \hline
+
+    \caption{Hyperparameters tested in the initial version of the training pipeline.}
+    \label{tab:hyperparameters}
+\end{longtable}
+
+\subsection{Clinical Model Selection Formula}
+After full training, the models are evaluated on the unseen test dataset. Any candidate models are required to pass a cross-validation sensitity requirement and final sensitivity requirement (see main document for details). We then use the following methodology to select the ``best'' candidate model that will ultimately be used clinically.  Note that this process is used for each variant/genotype combination, culminating in up to six final models (one per combo).
+
+\begin{enumerate}
+    \item Let $S_m=0.99$ be the minimum acceptable sensitivity and $S_t=0.995$ be the target sensitivity for the models.
+    \item For each candidate model, let $S$ be the final sensitivity and $F$ be the final false positive rate (FPR) for the model.
+    \item Calculate the scaled sensitivity score, that is at most 1.0 (representing a model reaching the target sensitivity): $S_s = min(1.0, {S - S_m \over S_t - S_m})$
+    \item Calculate the modified F1 score: $F = harmonic\_mean(S_s, F)$
+    \item Of the remaining models, select the model with the highest F1 score, $F$, for use clinically.
+\end{enumerate}

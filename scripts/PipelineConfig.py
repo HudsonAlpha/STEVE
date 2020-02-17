@@ -5,6 +5,11 @@
 #this is the repo directory
 REPO_DIRECTORY = '/gpfs/gpfs1/home/jholt/sanger_less_tests'
 
+#a dictionary containing metadata for the samples
+SAMPLE_JSONS = [
+    '%s/scripts/GIAB_all.json' % REPO_DIRECTORY
+]
+
 #root directory for RTG-based analysis, should contain VCFs as well (see README for directions)
 DATA_DIRECTORY = '/gpfs/gpfs1/home/jholt/csl_validations/core_pipeline_analysis/pipeline'
 

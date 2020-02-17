@@ -1,0 +1,23 @@
+\section{Sample metadata}
+This section contains information regarding the specific samples used for analysis.  This data is automatically pulled from a sample JSON file containing sample names, sample types (i.e. which GIAB sample), and how the sample was prepared.  Table \ref{tab:sample_metadata} contains the list of metadata as pulled from the JSON.
+
+% NOTE TO USER: if samples are added, make sure the sample JSON is updated or it won't get caught
+
+\begin{longtable}{|l|r|r|}
+    \hline
+    {{ FORMAT.HEADER_COLOR }}\textbf{Library}
+    {% for fk in FORMAT.METADATA_ORDER %}
+        &{{ '\\textbf{'+FORMAT.METADATA.get(fk, {}).get('label', fk)+'}' }}
+    {% endfor %}
+    \\ \hline
+    \endhead
+    {% for sample in sorted(METADATA.keys()) %}
+        {{ sample.replace('_', '\\_') }}
+        {% for fk in FORMAT.METADATA_ORDER %}
+            &{{ FORMAT.METADATA.get(fk, {}).get('format', FORMAT.METADATA['default']['format']).format(METADATA.get(sample, {}).get(fk, 'NOT IN METADATA')) }}
+        {% endfor %}
+        \\ \hline
+    {% endfor %}
+    \caption{This table contains metadata regarding each sequenced sample.  The GIAB sample label and prep type are currently the two pieces of tracked metadata regarding each sample.}
+    \label{tab:sample_metadata}
+\end{longtable}
