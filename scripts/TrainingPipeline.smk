@@ -2,7 +2,7 @@
 import os
 
 from RunTrainingPipeline import parseSlids
-from PipelineConfig import DATA_DIRECTORY, REPO_DIRECTORY
+from PipelineConfig import *
 
 #derived from repo 
 PIPELINE_DIRECTORY = '%s/pipeline' % REPO_DIRECTORY
@@ -10,23 +10,14 @@ EXTRACT_SCRIPT = '%s/scripts/ExtractFeatures.py' % REPO_DIRECTORY
 TRAINING_SCRIPT = '%s/scripts/TrainModels.py' % REPO_DIRECTORY
 DATA_REPORT_SCRIPT = '%s/scripts/PrintDataReport.py' % REPO_DIRECTORY
 MODEL_REPORT_SCRIPT = '%s/scripts/PrintModelReport.py' % REPO_DIRECTORY
+MODEL_ELI5_SCRIPT = '%s/scripts/ExtractELI5Results.py' % REPO_DIRECTORY
 
-ALIGNERS = [
-    'bwa-mem-0.7.17-BQSR',
-    #'sentieon-201808.07'
-]
-VARIANT_CALLERS = [
-    'strelka-2.9.10'
-]
-FULL_PIPES = [
-    ('dragen-07.011.352.3.2.8b', 'dragen-07.011.352.3.2.8b'),
-    ('clinical_sentieon-201808.07', 'strelka-2.9.10')
-]
+#pipeline specific
 THREADS_PER_PROC = 16
 
 #parse the sample names for the next steps
 RAW_SLIDS = config['sampleData']
-SAMPLE_LIST = sorted(set(parseSlids(RAW_SLIDS))))
+SAMPLE_LIST = sorted(set(parseSlids(RAW_SLIDS)))
 
 def getTrainedModels():
     '''
@@ -72,6 +63,20 @@ def getDataStats():
 
     return ret
 
+def getModelEli5s():
+    '''
+    This will return a list of model summaries we expect at this end of this
+    '''
+    ret = []
+    for al in ALIGNERS:
+        for vc in VARIANT_CALLERS:
+            ret.append('%s/eli5_summaries/%s/%s/model_eli5.json' % (PIPELINE_DIRECTORY, al, vc))
+    
+    for al, vc in FULL_PIPES:
+        ret.append('%s/eli5_summaries/%s/%s/model_eli5.json' % (PIPELINE_DIRECTORY, al, vc))
+
+    return ret
+
 rule train_models:
     input:
         *getTrainedModels()
@@ -83,6 +88,10 @@ rule summarize_models:
 rule data_stats:
     input:
         *getDataStats()
+
+rule model_eli5:
+    input:
+        *getModelEli5s()
 
 ##############################################################################################
 #FEATURE EXTRACTION
@@ -221,4 +230,25 @@ rule StrictSummarizeModels:
             -t 1.0 \
             {params.prefix} > \
             {output.summary}
+        '''
+
+rule ModelEli5:
+    input:
+        models="{pipeline_dir}/trained_models/{aligner}/{caller}/models.p",
+        rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
+        stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"
+    output:
+        eli5="{pipeline_dir}/eli5_summaries/{aligner}/{caller}/model_eli5.json"
+    params:
+        script=MODEL_ELI5_SCRIPT,
+        prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+    log: "{pipeline_dir}/logs/eli5_summaries/{aligner}/{caller}.log"
+    threads: 1
+    shell:
+        '''
+        python3 -u {params.script} \
+            -m 0.99 \
+            -t 0.995 \
+            {params.prefix} \
+            {output.eli5}
         '''

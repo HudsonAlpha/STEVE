@@ -9,6 +9,53 @@ import vcf
 
 from ExtractFeatures import ALL_METRICS, getVariantFeatures, GT_TRANSLATE, VAR_TRANSLATE
 
+def getClinicalModel(stats, acceptedRecall, targetRecall):
+    '''
+    @param stats - the stats dictionary from training
+    @param acceptedRecall - the minimum acceptable recall
+    @param targetRecall - the target we are aiming for 
+    @return - a dictionary with the eval recall, model name, and harmonic mean score
+    '''
+    bestModelTargetRecall = None
+    bestModelName = None
+    bestHM = 0.0
+    for mn in stats.keys():
+        for tr in stats[mn]['ALL_SUMMARY']:
+            #CM = confusion matrix
+            modelCM = np.array(stats[mn]['ALL_SUMMARY'][tr]['TEST_CM'][0])
+            if (np.sum(modelCM[:, 1]) == 0.0 or np.sum(modelCM[1, :]) == 0):
+                modelHM = 0.0
+            else:
+                modelRecall = modelCM[1, 1] / (modelCM[1, 0] + modelCM[1, 1])
+                trainTPR = np.array(stats[mn]['LEAVEONEOUT_SUMMARY'][tr]['TEST_TPR'])
+                trainAvg = np.mean(trainTPR)
+                trainStd = np.std(trainTPR)
+
+                #if the average training low end is too low OR the final model is outside the training bounds
+                # THEN we will not use the model
+                twoSDBottom = trainAvg - 2*trainStd
+                if (twoSDBottom < acceptedRecall or
+                    modelRecall < twoSDBottom):
+                    modelHM = 0.0
+                else:
+                    #in clinical, best is harmonic mean of our adjusted recall and our TNR
+                    modelTNR = modelCM[0, 0] / (modelCM[0, 0] + modelCM[0, 1])
+                    adjRecall = (modelRecall - acceptedRecall) / (float(targetRecall) - acceptedRecall)
+                    if adjRecall > 1.0:
+                        adjRecall = 1.0
+                    modelHM = 2 * adjRecall * modelTNR / (adjRecall+modelTNR)
+                    
+            if modelHM > bestHM:
+                bestModelTargetRecall = tr
+                bestModelName = mn
+                bestHM = modelHM
+    
+    return {
+        'eval_recall' : bestModelTargetRecall,
+        'model_name' : bestModelName,
+        'hm_score' : bestHM
+    }
+
 def evaluateVariants(args):
     '''
     This is the work-horse function
@@ -103,49 +150,6 @@ def runSubType(variantType, args, stats, models, statKey):
                 bestModelName = mn
                 bestHM = modelHM
         evalList = [bestModelName]
-    elif modelName == 'clinical_v1':
-        targetThresholds = {
-            '0.995' : 0.99
-        }
-        if targetRecall not in targetThresholds:
-            raise Exception('"clinical" mode has no defined threshold for target recall "%s"' % targetRecall)
-        acceptedRecall = targetThresholds[targetRecall]
-        
-        bestModelName = None
-        bestHM = 0.0
-        for mn in stats.keys():
-            #CM = confusion matrix
-            modelCM = np.array(stats[mn]['ALL_SUMMARY'][targetRecall]['TEST_CM'][0])
-            if (np.sum(modelCM[:, 1]) == 0.0 or np.sum(modelCM[1, :]) == 0):
-                modelHM = 0.0
-            else:
-                modelRecall = modelCM[1, 1] / (modelCM[1, 0] + modelCM[1, 1])
-                trainTPR = np.array(stats[mn]['LEAVEONEOUT_SUMMARY'][targetRecall]['TEST_TPR'])
-                trainAvg = np.mean(trainTPR)
-                trainStd = np.std(trainTPR)
-
-                #if the average training low end is too low OR the final model is outside the training bounds
-                # THEN we will not use the model
-                twoSDBottom = trainAvg - 2*trainStd
-                if (twoSDBottom < acceptedRecall or
-                    modelRecall < twoSDBottom):
-                    modelHM = 0.0
-                else:
-                    #in clinical, best is harmonic mean of our adjusted recall and our TNR
-                    modelTNR = modelCM[0, 0] / (modelCM[0, 0] + modelCM[0, 1])
-                    adjRecall = (modelRecall*100 - 99)
-                    modelHM = 2 * adjRecall * modelTNR / (adjRecall+modelTNR)
-                    
-            if modelHM > bestHM:
-                bestModelName = mn
-                bestHM = modelHM
-        
-        if bestModelName == None:
-            #this is the unfortunate event that NO model passes 
-            recurseLines, recurseDicts = runReferenceCalls(variantType, args, int(statKey.split('_')[0]), int(statKey.split('_')[1]))
-            return retLines+recurseLines, retDictForm+recurseLines
-        else:
-            evalList = [bestModelName]
     
     elif modelName == 'clinical':
         targetThresholds = {
@@ -155,41 +159,10 @@ def runSubType(variantType, args, stats, models, statKey):
             raise Exception('"clinical" mode has no defined threshold for target recall "%s"' % targetRecall)
         acceptedRecall = targetThresholds[targetRecall]
         
-        bestModelTargetRecall = None
-        bestModelName = None
-        bestHM = 0.0
-        for mn in stats.keys():
-            for tr in stats[mn]['ALL_SUMMARY']:
-                #CM = confusion matrix
-                modelCM = np.array(stats[mn]['ALL_SUMMARY'][tr]['TEST_CM'][0])
-                if (np.sum(modelCM[:, 1]) == 0.0 or np.sum(modelCM[1, :]) == 0):
-                    modelHM = 0.0
-                else:
-                    modelRecall = modelCM[1, 1] / (modelCM[1, 0] + modelCM[1, 1])
-                    trainTPR = np.array(stats[mn]['LEAVEONEOUT_SUMMARY'][tr]['TEST_TPR'])
-                    trainAvg = np.mean(trainTPR)
-                    trainStd = np.std(trainTPR)
-
-                    #if the average training low end is too low OR the final model is outside the training bounds
-                    # THEN we will not use the model
-                    twoSDBottom = trainAvg - 2*trainStd
-                    if (twoSDBottom < acceptedRecall or
-                        modelRecall < twoSDBottom):
-                        modelHM = 0.0
-                    else:
-                        #in clinical, best is harmonic mean of our adjusted recall and our TNR
-                        modelTNR = modelCM[0, 0] / (modelCM[0, 0] + modelCM[0, 1])
-                        #adjRecall = (modelRecall*100 - 99)
-                        #adjRecall = modelRecall
-                        adjRecall = (modelRecall - acceptedRecall) / (float(targetRecall) - acceptedRecall)
-                        if adjRecall > 1.0:
-                            adjRecall = 1.0
-                        modelHM = 2 * adjRecall * modelTNR / (adjRecall+modelTNR)
-                        
-                if modelHM > bestHM:
-                    bestModelTargetRecall = tr
-                    bestModelName = mn
-                    bestHM = modelHM
+        #get the clinical model
+        clinicalModelDict = getClinicalModel(stats, acceptedRecall, targetRecall)
+        bestModelName = clinicalModelDict['model_name']
+        bestModelTargetRecall = clinicalModelDict['eval_recall']
         
         if bestModelName == None:
             #this is the unfortunate event that NO model passes 

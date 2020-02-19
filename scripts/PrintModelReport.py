@@ -8,6 +8,7 @@ import numpy as np
 import os
 import pickle
 
+from EvaluateVariants import getClinicalModel
 from ExtractFeatures import GT_TRANSLATE, VAR_TRANSLATE
 
 def printAllStats(modelDir, rocDir, minRecall, targetRecall):
@@ -129,59 +130,25 @@ def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels):
         stats = allStats[k]
         reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
 
-        bestModelTargetRecall = None
-        bestModelName = None
-        bestHM = 0.0
-        for mn in stats.keys():
-            for tr in stats[mn]['ALL_SUMMARY']:
-                #CM = confusion matrix
-                modelCM = np.array(stats[mn]['ALL_SUMMARY'][tr]['TEST_CM'][0])
-                if (np.sum(modelCM[:, 1]) == 0.0 or np.sum(modelCM[1, :]) == 0):
-                    modelHM = 0.0
-                else:
-                    modelRecall = modelCM[1, 1] / (modelCM[1, 0] + modelCM[1, 1])
-                    trainTPR = np.array(stats[mn]['LEAVEONEOUT_SUMMARY'][tr]['TEST_TPR'])
-                    trainAvg = np.mean(trainTPR)
-                    trainStd = np.std(trainTPR)
+        clinDict = getClinicalModel(stats, acceptedRecall, targetRecall)
+        bestModelName = clinDict['model_name']
 
-                    #if the average training low end is too low OR the final model is outside the training bounds
-                    # THEN we will not use the model
-                    twoSDBottom = trainAvg - 2*trainStd
-                    if (twoSDBottom < acceptedRecall or
-                        modelRecall < twoSDBottom):
-                        modelHM = 0.0
-                    else:
-                        #in clinical, best is harmonic mean of our adjusted recall and our TNR
-                        modelTNR = modelCM[0, 0] / (modelCM[0, 0] + modelCM[0, 1])
-                        #adjRecall = (modelRecall*100 - 99)
-                        #adjRecall = modelRecall
-                        adjRecall = (modelRecall - acceptedRecall) / (float(targetRecall) - acceptedRecall)
-                        if adjRecall > 1.0:
-                            adjRecall = 1.0
-                        modelHM = 2 * adjRecall * modelTNR / (adjRecall+modelTNR)
-                        
-                if modelHM > bestHM:
-                    bestModelTargetRecall = tr
-                    bestModelName = mn
-                    bestHM = modelHM
-
-                    bestTPRAvg = trainAvg
-                    bestTPRStd = trainStd
-                    bestTPR = modelRecall
-
-                    bestFPRAvg = np.mean(stats[mn]['LEAVEONEOUT_SUMMARY'][tr]['TEST_FPR'])
-                    bestFPRStd = np.std(stats[mn]['LEAVEONEOUT_SUMMARY'][tr]['TEST_FPR'])
-                    bestFPR = stats[mn]['ALL_SUMMARY'][tr]['TEST_FPR'][0]
-        
         if bestModelName == None:
             #this is the unfortunate event that NO model passes 
             print(reformKey, 'None', 'None', '--', '--', '--', '--', sep='\t')
         else:
-            clf = allModels[k][bestModelName]['MODEL']
-            coreFeatureNames = [tuple(f.split('-')) for f in allModels[k][bestModelName]['FEATURES']]
+            bestModelTargetRecall = clinDict['eval_recall']
+
+            #copy TPR results
+            bestTPR = stats[bestModelName]['ALL_SUMMARY'][bestModelTargetRecall]['TEST_TPR'][0]
+            bestTPRAvg = np.mean(stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_TPR'])
+            bestTPRStd = np.std(stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_TPR'])
             
-            modelTargetRecall = bestModelTargetRecall
-            evalList = [bestModelName]
+            #get FPR results
+            bestFPRAvg = np.mean(stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_FPR'])
+            bestFPRStd = np.std(stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_FPR'])
+            bestFPR = stats[bestModelName]['ALL_SUMMARY'][bestModelTargetRecall]['TEST_FPR'][0]
+
             rowVals = [
                 reformKey, bestModelName, bestModelTargetRecall,
                 '%0.4f+-%0.4f' % (bestTPRAvg, bestTPRStd), 
@@ -190,10 +157,6 @@ def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels):
                 '%0.4f' % bestFPR
             ]
             print(*rowVals, sep='\t')
-            #TODO: if you want to explore this, need to import the eli5 (costly, so should make an option)
-            #import eli5
-            #print(eli5.formatters.text.format_as_text(eli5.explain_weights(clf, feature_names=[str(cfn) for cfn in coreFeatureNames])))
-    
 
 if __name__ == "__main__":
     #first set up the arg parser

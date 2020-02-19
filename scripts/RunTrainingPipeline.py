@@ -104,6 +104,7 @@ if __name__ == "__main__":
     
     #optional arguments with default
     p.add_argument('-d', '--data-stats', dest='data_stats', action='store_true', default=False, help='get data statistics on features (default: False)')
+    p.add_argument('-e', '--model-eli5', dest='model_eli5', action='store_true', default=False, help='get eli5 results for "clinical" models (default: False)')
     p.add_argument('-s', '--summarize-models', dest='summarize_models', action='store_true', default=False, help='summarize model results (default: False)')
     p.add_argument('-t', '--train-models', dest='train_models', action='store_true', default=False, help='train the models using the pipeline structure (default: False)')
     p.add_argument('-x', '--execute', dest='execute', action='store_true', default=False, help='execute the commands (default: False)')
@@ -144,6 +145,10 @@ if __name__ == "__main__":
     if args.data_stats:
         somethingToDo = True
         buildFrags.append('data_stats')
+    
+    if args.model_eli5:
+        somethingToDo = True
+        buildFrags.append('model_eli5')
 
     if somethingToDo:
         fullCmd = ' '.join(snakemakeFrags+buildFrags)
