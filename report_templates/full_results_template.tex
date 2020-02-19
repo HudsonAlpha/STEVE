@@ -148,6 +148,46 @@ Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_best_models} contains the strict model
     \label{tab:{{ ALIGNER }}_{{ CALLER }}_best_models}
 \end{table}
 
+\subsubsection{Feature Importances}
+Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_eli5} contains results regarding feature importances according to the models.  These were gathered using the \texttt{eli5} package and the \texttt{ExtractELI5Results.py} script from this repo. Feature importances may be missing due to any of the following reasons:
+
+\begin{enumerate}
+    \item ELI5 interpretation was not run correctly - This could be because the \texttt{ExtractELI5Results.py} script has not been executed or the outputs are not in the expected location.
+    \item The model failed to pass our base clinical criteria - We restricted the outputs to only include models that met the minimum sensitivity requirement as defined in the ``Selected Models'' section above.
+    \item The model is not interpretable by \texttt{eli5} - Not all models provide feature importance measures through eli5 so these results are excluded
+\end{enumerate}
+
+\begin{table}
+    \centering
+    \begin{tabular}{|l|r|r|r|r|r|r|r|}
+        \hline
+        {{ FORMAT.HEADER_COLOR }}
+        \textbf{Feature}
+        {% for vt in FORMAT.VARIANT_ORDER %}
+            {% for gt in FORMAT.CALL_ORDER %}
+                &\rot{{"{"}}{{ vt }}-{{ gt }}}
+            {% endfor %}
+        {% endfor %}
+        &Cumulative \\ \hline
+        {% for feature in ELI5_RESULTS.COMBINED_ORDER %}
+            {{ feature.replace('_', '\\_') }}
+            {% for vt in FORMAT.VARIANT_ORDER %}
+                {% for gt in FORMAT.CALL_ORDER %}
+                    {% if vt+'_'+gt in ELI5_RESULTS.COMBINED_DICT[feature] %}
+                        &{{ '{:0.4f}'.format(ELI5_RESULTS.COMBINED_DICT[feature][vt+'_'+gt]['weight']) }}
+                    {% else %}
+                        &--
+                    {% endif %}
+                {% endfor %}
+            {% endfor %}
+            &{{ '{:0.4f}'.format(ELI5_RESULTS.COMBINED_DICT.get(feature, {}).get('CUMULATIVE_WEIGHT', 0.0)) }}
+            \\ \hline
+        {% endfor %}
+    \end{tabular}
+    \caption{This table shows the feature importances results for aligner ``{{ ALIGNER_LABEL}}'' and caller ``{{ CALLER_LABEL }}''. Importances are broken down by category with a cumulative sum at the end. Note that some results may be missing if the pipeline was run incorrectly or the models are not interpretable through \texttt{eli5}.}
+    \label{tab:{{ ALIGNER }}_{{ CALLER }}_eli5}
+\end{table}
+
 {% for vt in FORMAT.VARIANT_ORDER %}
     {% for gt in FORMAT.CALL_ORDER %}
         \subsubsection{Model for {{vt}}-{{gt}}}
@@ -162,5 +202,8 @@ Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_best_models} contains the strict model
         {% else %}
             No image found, try re-running the pipeline with the \texttt{-s} option to produce summary images.
         {% endif %}
+
+        %DEPRECATED: old ELI5 results were placed here
+
     {% endfor %}
 {% endfor %}

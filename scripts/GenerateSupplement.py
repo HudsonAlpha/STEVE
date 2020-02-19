@@ -47,13 +47,15 @@ def getModelResults(aligner, caller):
     #get all the training results for this aligner/caller combo
     trainingResults = getTrainingResults(aligner, caller)
     strictResults = getTrainingResults(aligner, caller, True)
+    eli5Results = getEli5Results(aligner, caller)
 
     retDict = {
         'ALIGNER' : aligner,
         'CALLER' : caller,
         'RTG_RESULTS' : rtgResults,
         'TRAINING_RESULTS' : trainingResults,
-        'STRICT_RESULTS' : strictResults
+        'STRICT_RESULTS' : strictResults,
+        'ELI5_RESULTS' : eli5Results
     }
     return retDict
 
@@ -220,6 +222,78 @@ def getTrainingResults(aligner, caller, strict=False):
     }
     return ret
 
+def getEli5Results(aligner, caller):
+    '''
+    This will retrieve ELI5 results if available
+    @param aligner - the aligner specified
+    @param caller - the caller specified
+    @return - a dictionary of metrics for this combo
+    '''
+    jsonFN = '%s/pipeline/eli5_summaries/%s/%s/model_eli5.json' % (REPO_DIRECTORY, aligner, caller)
+
+    #catch the situation where we didn't run ELI5 for w/e reason
+    ret = {}
+    if not os.path.exists(jsonFN):
+        dataDict = {}
+    else:
+        fp = open(jsonFN, 'r')
+        dataDict = json.load(fp)
+        fp.close()
+    
+    cumulativeFI = {}
+
+    for vt in VAR_TRANSLATE.keys():
+        for gt in GT_TRANSLATE.keys():
+            if gt == GT_REF_HOM:
+                continue
+            reformKey = VAR_TRANSLATE[vt]+'_'+GT_TRANSLATE[gt]
+            if reformKey in dataDict:
+                #include errors if they occur and feature importances
+                bm = dataDict[reformKey]['best_model']
+                featImp = dataDict[reformKey].get('eli5', {}).get('feature_importances', {})
+                if featImp == None:
+                    featImp = []
+                else:
+                    featImp = featImp.get('importances', [])
+                if bm != None:
+                    ret[reformKey] = {
+                        'BEST_MODEL' : bm,
+                        'ERROR' : dataDict[reformKey].get('eli5', {}).get('error', None),
+                        'FEATURE_IMPORTANCES' : featImp
+                    }
+
+                    #create the cumulative dictionary here
+                    for featDict in featImp:
+                        featureName = featDict['feature']
+                        if featureName not in cumulativeFI:
+                            cumulativeFI[featureName] = {}
+                        cumulativeFI[featureName][reformKey] = featDict
+                else:
+                    ret[reformKey] = {
+                        'BEST_MODEL' : 'None',
+                        'ERROR' : 'No passing models.',
+                        'FEATURE_IMPORTANCES' : []
+                    }
+            else:
+                ret[reformKey] = {
+                    'BEST_MODEL' : 'None',
+                    'ERROR' : 'No ELI5 results detected',
+                    'FEATURE_IMPORTANCES' : []
+                }
+    
+    #now post-process the cumulative
+    for fn in cumulativeFI:
+        cumWeight = 0
+        for reformKey in cumulativeFI[fn]:
+            cumWeight += cumulativeFI[fn][reformKey]['weight']
+        cumulativeFI[fn]['CUMULATIVE_WEIGHT'] = cumWeight
+    
+    orderedCumWeight = sorted(cumulativeFI.keys(), key=lambda k: cumulativeFI[k]['CUMULATIVE_WEIGHT'], reverse=True)
+    ret['COMBINED_DICT'] = cumulativeFI
+    ret['COMBINED_ORDER'] = orderedCumWeight
+
+    return ret
+
 def generateReport(dataDict, prefix):
     '''
     This will fill in all the template to create our report and then call the appropriate latex commands.
@@ -320,10 +394,21 @@ if __name__ == "__main__":
 
     #this will load data from each aligner/caller combination
     PARSED_DATA = {}
-    summaryPattern = '%s/pipeline/model_summaries/*/*/model_summary.tsv' % REPO_DIRECTORY
-    summaryFiles = sorted(glob.glob(summaryPattern))
-    for fn in summaryFiles:
-        aligner, caller = fn.split('/')[-3:-1]
+    combos = []
+    for aligner in ALIGNERS:
+        for caller in VARIANT_CALLERS:
+            combos.append((aligner, caller))
+    for fullPipe in FULL_PIPES:
+        combos.append(fullPipe)
+
+    for aligner, caller in combos:
+        #check for the summary file
+        summaryFN = '%s/pipeline/model_summaries/%s/%s/model_summary.tsv' % (REPO_DIRECTORY, aligner, caller)
+        if not os.path.exists(summaryFN):
+            print('WARNING: Summary file for %s/%s was not found, re-run pipeline?')
+            continue
+
+        #get the results
         comboData = getModelResults(aligner, caller)
         
         #rename

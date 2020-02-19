@@ -27,6 +27,14 @@ This pipeline uses a combination of Sentieon (more efficient implementation of B
 \subsubsection{Sentieon paired-end alignment}
 The following command is used on each pair of FASTQ files for a sample.  In brief, it performs the alignment process using sentieon, passes that into the post-alt alignment process derived from \href{https://github.com/lh3/bwa/blob/master/README-alt.md}{bwa-kit} (this is recommended due to ALT contigs in the hg38 reference), and finally used the sention sorting function.  The output of this command is a single, position-sorted BAM file that has been post-alt processed and the corresponding index file.
 
+\noindent\textbf{Parameters:}
+\begin{enumerate}
+    \item rgoptions - Read Group (RG) options for the particular flowcell/lane combination
+    \item reference - the filename for the reference genome (hg38 with all ALT contigs for our use case)
+    \item bwakit - directory containing a download of the \href{https://github.com/lh3/bwa/blob/master/README-alt.md}{bwa-kit} post-ALT processing
+    \item tempParams - a temporary directory, can be removed without altering command outputs
+\end{enumerate}
+
 \begin{lstlisting}[language=bash]
 sentieon \
     bwa mem -M \
@@ -48,11 +56,11 @@ sentieon util sort {params.tempParams} \
 \end{lstlisting}
 
 \subsubsection{Sentieon deduplication}
-The following command will gather duplication statistics across \textbf{ALL} BAM files for a sample and then simultaneously remove duplicates while merging the BAM files together.  The output of this step is a single BAM file containing all alignments for the sample and the corresponding index file.
+The following command will gather duplication statistics across \textit{all} BAM files for a sample and then simultaneously remove duplicates while merging the BAM files together.  The output of this step is a single BAM file containing all alignments for the sample and the corresponding index file.
 
 \noindent\textbf{Parameters:}
 \begin{enumerate}
-    \item sortedbams - this is a concatenation of \texttt{-i BAM} for each BAM file in the sample
+    \item sortedbams - this is a concatenation of \texttt{-i \{BAM\}} for each BAM file in the sample (i.e. each flowcell/lane BAM file generated in the previous step)
 \end{enumerate}
 
 \begin{lstlisting}[language=bash]
@@ -78,6 +86,7 @@ The following command will gather base quality score information for the de-dupl
 
 \noindent\textbf{Parameters:}
 \begin{enumerate}
+    \item reference - the filename for the reference genome (hg38 with all ALT contigs for our use case)
     \item dbsnp - this is the dbSNP file gathered from this URL: \url{ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/hg38/dbsnp_146.hg38.vcf.gz}
     \item mills - the is the Mills indel file gathered from this URL: \url{ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/hg38/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz}
     \item tempParams - a temporary directory, can be removed without altering command outputs
@@ -106,7 +115,9 @@ The following command will execute the Strelka2 workflow to perform variant call
 
 \noindent\textbf{Parameters:}
 \begin{enumerate}
-    \item contigs - this is a restricted contig file (BED format) to reduce run time of Strelka2, see README file at \url{https://github.com/Illumina/strelka/blob/v2.9.x/docs/userGuide/README.md#improving-runtime-for-references-with-many-short-contigs-such-as-grch38} for the exact file.
+    \item strelka - the path to the repo contain strelka2
+    \item reference - the filename for the reference genome (hg38 with all ALT contigs for our use case)
+    \item contigs - this is a restricted contig file (BED format) to reduce run time of Strelka2, see README file at \url{https://github.com/Illumina/strelka/blob/v2.9.x/docs/userGuide/README.md#improving-runtime-for-references-with-many-short-contigs-such-as-grch38} for the exact file and context behind usage
     \item memGB - a memory limit for strelka2
     \item bcftools - path to a \href{http://samtools.github.io/bcftools/bcftools.html}{bcftools} executable for performing annotation; the version used was 1.10.2
     \item dbsnp - this is the dbSNP file gathered from this URL: \url{ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/hg38/dbsnp_146.hg38.vcf.gz}
