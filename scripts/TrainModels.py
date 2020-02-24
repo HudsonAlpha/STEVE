@@ -9,7 +9,6 @@ import pickle
 
 #learning related imports
 from imblearn.ensemble import EasyEnsembleClassifier
-
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -27,7 +26,7 @@ from sklearn.utils import shuffle
 from ExtractFeatures import VAR_SNP, VAR_INDEL, GT_REF_HET, GT_ALT_HOM, GT_HET_HET, GT_REF_HOM
 from RunTrainingPipeline import parseSlids
 
-#define the training mode here
+#define the training modes here
 EXACT_MODE = 0
 GRID_MODE = 1
 
@@ -141,8 +140,8 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
     #parameters we will use for all training
     configuration = {
         'TRAINING_MODE' : GRID_MODE,
-        'USE_SUBSET' : False, #change to false when debugging is complete
-        'SUBSET_SIZE' : 100000,
+        'USE_SUBSET' : False, #if True, restricts input size to "SUBSET_SIZE" for each sample
+        'SUBSET_SIZE' : 100000, #this only matter if USE_SUBSET is True
         'FILTER_VARIANTS_BY_TYPE' : filterEnabled,
         'FILTER_VAR_TYPE' : variantType,
         'FILTER_CALL_TYPE' : callType,
@@ -242,6 +241,9 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
     print('Final test size:', final_test_X.shape)
     #print(final_test_Y.shape)
 
+    #TODO: future possible optimization - RandomForest and EasyEnsemble have a "n_jobs" parameters for parallel 
+    # fit/predict; is there a way we can utilize that in general?
+
     #now enumerate the models
     classifiers = [
         ('RandomForest', RandomForestClassifier(random_state=0, class_weight='balanced', max_depth=4, n_estimators=200, min_samples_split=2, max_features='sqrt'),
@@ -270,7 +272,8 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
             'max_depth' : [3, 4],
             'learning_rate' : [0.05, 0.1, 0.2],
             'loss' : ['deviance', 'exponential'],
-            'max_features' : ['sqrt']
+            'max_features' : ['sqrt'],
+            #'subsample' : [0.5, 1.0] #TODO: this could lead to performance increase, should try in future revisions
         }),
         ('EasyEnsemble', EasyEnsembleClassifier(random_state=0, n_estimators=50),
         {
@@ -278,8 +281,7 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
             'n_estimators' : [10, 20, 30, 40, 50]
         })
     ]
-    #classifiers = classifiers[2:]
-
+    
     #go through each model, one at a time
     for (label, raw_clf, hyperparameters) in classifiers:
         print('[%s] Starting training for %s...' % (str(datetime.datetime.now()), label))
@@ -356,8 +358,6 @@ def trainClassifier(raw_clf, hyperparameters, train_X, train_Y, train_groups, co
     else:
         raise Exception('Unexpected mode')
     
-    #if CURRENT_MODE in [GRID_MODE]:
-    #    print('\tBest params:', clf.best_params_)
     if CURRENT_MODE == EXACT_MODE:
         return clf, [], []
     elif CURRENT_MODE == GRID_MODE:
@@ -404,7 +404,7 @@ def summarizeResults(results, test_Ys):
     print('[%s]\tRunning threshold tests...' % (str(datetime.datetime.now()), ))
     recallValues = np.array([1.0, 0.9999, 0.999, 0.998, 0.997, 0.996, 0.995, 0.99])
     
-    #TODO: if we want to do confidence intervals on errors, look into it here:
+    #TODO: if we want to do confidence intervals on errors, look into it here: (For now, I think CV is fine)
     #https://machinelearningmastery.com/report-classifier-performance-confidence-intervals/
     #note for future matt, if you get 0 errors out of N classifications, we would need to assume the NEXT
     #thing seen is an error and calculate with 1 error out of (N+1) classifications to get our bounds
@@ -413,7 +413,6 @@ def summarizeResults(results, test_Ys):
     # 2580 false positive variants and ONLY missed one, we would qualify for the 99.9-100% accuracy range with 
     # 99% confidence in that interval
     
-    #print('', 'tarTPR', 'ind', 'FPR', 'TPR', 'threshold', 'adjConf', 'test_FPR', 'test_TPR', sep='\t')
     ret = {}
     print('', 'tarTPR', 'train_FPR', 'train_TPR', 'test_FPR', 'test_TPR', 'adjConf', sep='\t')
     for minRecall in recallValues:
@@ -451,7 +450,7 @@ def summarizeResults(results, test_Ys):
             testFprList.append(test_FPR)
             testTprList.append(test_TPR)
 
-        #print('', 'tarTPR', 'train_FPR', 'train_TPR', 'adjConf', 'test_FPR', 'test_TPR', sep='\t')
+        #dump some output to the screen for sanity
         printVals = [
             ('%s', ''),
             ('%0.4f', minRecall),
@@ -485,7 +484,6 @@ if __name__ == "__main__":
     p = ap.ArgumentParser(description=DESC, formatter_class=ap.RawTextHelpFormatter)
     
     #optional arguments with default
-    #p.add_argument('-d', '--date-subdir', dest='date_subdir', default=None, help='the date subdirectory (default: "hli-YYMMDD")')
     p.add_argument('-p', '--processes', dest='processes', type=int, default=1, help='the number of processes to use (default: 1)')
     p.add_argument('-s', '--split-by-type', dest='split_by_type', action='store_true', default=False, help='split into multiple models by variant/zygosity types (default: False)')
 

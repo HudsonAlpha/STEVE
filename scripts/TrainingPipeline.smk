@@ -12,9 +12,6 @@ DATA_REPORT_SCRIPT = '%s/scripts/PrintDataReport.py' % REPO_DIRECTORY
 MODEL_REPORT_SCRIPT = '%s/scripts/PrintModelReport.py' % REPO_DIRECTORY
 MODEL_ELI5_SCRIPT = '%s/scripts/ExtractELI5Results.py' % REPO_DIRECTORY
 
-#pipeline specific
-THREADS_PER_PROC = 16
-
 #parse the sample names for the next steps
 RAW_SLIDS = config['sampleData']
 SAMPLE_LIST = sorted(set(parseSlids(RAW_SLIDS)))
@@ -128,17 +125,24 @@ rule ExtractFeatures:
 def getFeatureFiles(wildcards):
     '''
     This will return the set of feature files required to perform training
+    @param wildcards - the wildcards from the snakemake rule; need "pipeline_dir", "aligner", and "caller"
+    @return - a list of feature files required for training, see "postFixes" variable for specifics
     '''
+    #get the wildcards
     pd = wildcards['pipeline_dir']
     al = wildcards['aligner']
     vc = wildcards['caller']
-    ret = []
+    
+    #file post-fixes that we need to make sure are gathered up
     postFixes = [
         'fp_fields.json',
         'fp.npy',
         'tp_fields.json',
         'tp.npy'
     ]
+    
+    #now do it
+    ret = []
     for slid in SAMPLE_LIST:
         for pf in postFixes:
             ret.append('%s/features/%s/%s/%s_%s' % (pd, al, vc, slid, pf))
@@ -148,7 +152,6 @@ rule TrainModels:
     input:
         getFeatureFiles
     output:
-        #metadata is now captured in the model pickle file
         models="{pipeline_dir}/trained_models/{aligner}/{caller}/models.p",
         rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
         stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"
@@ -159,6 +162,8 @@ rule TrainModels:
         output_prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
     log: "{pipeline_dir}/logs/trained_models/{aligner}/{caller}_training.log"
     threads: THREADS_PER_PROC #only applies to CV, but still a big speedup
+    resources:
+        mem_mb=48000
     shell:
         '''
         python3 -u {params.script} \

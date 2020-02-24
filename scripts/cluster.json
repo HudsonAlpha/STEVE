@@ -1,11 +1,8 @@
 {
     "__default__": {
         "queue" : "c7normal",
-        "memory" : 4000,
-        "name" : "{rule}.{wildcards}",
-        "log" : "{log}"
-    },
-    "TrainModels": {
-        "memory" : 48000
+        "logdir" : "/gpfs/gpfs2/csl/WGS_processing/pipeline/logs/cluster",
+        "memory" : 8000,
+        "mem_mb" : 8000
     }
 }

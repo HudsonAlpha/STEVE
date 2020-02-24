@@ -71,7 +71,7 @@ def gatherClinicalModelStats(allStats, acceptedRecall, targetRecall, allModels):
 
 if __name__ == "__main__":
     #first set up the arg parser
-    DESC="Script for summarizing training performance"
+    DESC="Script for summarizing feature importances from final models"
     p = ap.ArgumentParser(description=DESC, formatter_class=ap.RawTextHelpFormatter)
     
     #optional arguments with default

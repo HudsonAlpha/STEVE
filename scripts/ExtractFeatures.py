@@ -54,6 +54,7 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
     @param sampleID - the sample in the VCF file
     @param fields - the fields to extract from the variant
     @param rawReader - the raw VCF file
+    @param allowHomRef - if True, this will allow 0/0 calls (otherwise, it throws an error)
     @return - a list of ordered features
     '''
     annots = []
@@ -83,11 +84,6 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
     #pull this out for use by all the AD stat fields
     callAD = callStats['AD']
     adSum = sum(callAD)
-    
-    #run the top two filters
-    #maxAF = (max([adVal / adSum for adVal in callAD[1:]]) if adSum != 0.0 else 0.0)
-    #if adSum < 8 or maxAF < 0.15:
-    #    continue
 
     for k, subk in fields:
         if k == 'VAR':
@@ -104,6 +100,7 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
 
         elif k == 'CALL':
             #these are call specific measures
+            # all sub-keys default to a FLOAT interpretation if not specifically handled (see "else" clause)
             if subk == 'GT':
                 if gtPieces[0] == gtPieces[1]:
                     if gtPieces[0] == '0':
@@ -114,10 +111,13 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
                     val = GT_REF_HET
                 else:
                     val = GT_HET_HET
+
             elif subk == 'AD0':
                 val = (callAD[int(gtPieces[0])] if adSum > 0 else DEFAULT_MISSING)
+
             elif subk == 'AD1':
                 val = (callAD[int(gtPieces[1])] if adSum > 0 else DEFAULT_MISSING)
+
             elif subk == 'ADO':
                 if gtPieces[0] == gtPieces[1]:
                     #homozygous, pull AD once
@@ -128,10 +128,13 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
                 
                 #AD-other is the total AD minus the GT AD
                 val = ((adSum - adUsed) if adSum > 0 else DEFAULT_MISSING)
+
             elif subk == 'AF0':
                 val = (callAD[int(gtPieces[0])] / adSum if adSum > 0 else DEFAULT_MISSING)
+
             elif subk == 'AF1':
                 val = (callAD[int(gtPieces[1])] / adSum if adSum > 0 else DEFAULT_MISSING)
+
             elif subk == 'AFO':
                 if gtPieces[0] == gtPieces[1]:
                     #homozygous, pull AD once
@@ -142,6 +145,7 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
                 
                 #AD-other is the total AD minus the GT AD
                 val = ((adSum - adUsed) / adSum if adSum > 0 else DEFAULT_MISSING)
+
             else:
                 try:
                     val = float(callStats[subk])
@@ -152,11 +156,14 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
 
         elif k == 'INFO':
             #get from the INFO column
+            # all values here default to a FLOAT interpretation
             val = (float(variant.INFO[subk]) if (subk in variant.INFO) else DEFAULT_MISSING)
             annots.append(val)
         
         elif k == 'MUNGED':
+            #create a custom metric outside of INFO or CALL
             if subk == 'DP_DP':
+                #call depth / total variant depth; usually ~1.0 if single sample
                 try:
                     dpCall = callStats['DP']
                     dpVar = variant.INFO['DP']
@@ -165,12 +172,14 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
                 except:
                     #TODO: this was added for strelka, should we remove or patch it better?
                     annots.append(DEFAULT_MISSING)
+
             elif subk == 'QUAL':
                 val = variant.QUAL
                 if val == None:
                     annots.append(DEFAULT_MISSING)
                 else:
                     annots.append(val)
+
             elif subk == 'NEARBY':
                 #search the raw VCF for nearby calls
                 nearbyFound = 0
@@ -182,12 +191,15 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
                             nearbyFound += 1
                             
                 annots.append(nearbyFound)
+
             elif subk == 'FILTER':
                 #store the number of filters applied (PASS doesn't show up in these lists)
                 annots.append(len(variant.FILTER))
+
             elif subk == 'ID':
                 #this is basically a boolean flag capturing if the variant has an ID annotation
                 annots.append((0 if variant.ID == None else 1))
+
             else:
                 raise Exception('Unhandled computed measurement: %s-%s' % (k, subk))
         else:
@@ -201,7 +213,7 @@ def gatherVcfMetrics(vcfFN, rawVCF, metrics):
     @param vcfFN - the vcf filename to load stats for, limited to one rtg output type (i.e. tp, fp, etc.)
     @param rawVCF - the original vcf filename
     @param metrics - the specific set of metrics we want to get info on; key is the broad category of where the data
-    is in the VCF, and value is a list of values from that category to gather
+        is in the VCF, and value is a list of values from that category to gather
     @return - tuple (data, fields)
         data - a NxF matrix of variant annotations; N = number of variants, F = number of fields per variant
         fields - the column labels of the F dimension (i.e. field names)
@@ -241,6 +253,14 @@ def gatherVcfMetrics(vcfFN, rawVCF, metrics):
     return ret, fields
 
 def extractFeatures(aligner, caller, samples, outPrefix):
+    '''
+    This will run the feature extraction after identifying the appropriate inputs
+    @param aligner - the aligner that was used upstream
+    @param caller - the caller tht was used upstream
+    @param samples - a file or string corresponding to the samples (see parseSlids(...) function)
+    @param outPrefix - prefix for the extracted feature output
+    @return - None
+    '''
     #0 - constants based on input
     RTG_ROOT = '%s/rtg_results/%s/%s' % (DATA_DIRECTORY, aligner, caller)
     VCF_ROOT = '%s/variant_calls/%s/%s' % (DATA_DIRECTORY, aligner, caller)
@@ -248,15 +268,11 @@ def extractFeatures(aligner, caller, samples, outPrefix):
     CLASSIFICATION_TYPES = ['fp', 'tp']
     VCF_METRICS = ALL_METRICS[caller]
     
-    #TODO: make regenerate a parameter
+    #TODO: make regenerate a parameter?
     REGENERATE = True
     
     #1 - load the samples
     SAMPLES = parseSlids(samples)
-    #fp = open(sampleFN, 'r')
-    #for l in fp:
-    #    SAMPLES.append(l.rstrip())
-    #fp.close()
     
     #2 - make sure results exist for each aligner-caller-sample triplet
     acDir = '%s/%s/%s' % (OUTPUT_ROOT, aligner, caller)
@@ -332,14 +348,8 @@ def extractFeatures(aligner, caller, samples, outPrefix):
     tpLens = [arr.shape[0] for arr in tpList]
     fpLens = [arr.shape[0] for arr in fpList]
 
-    print(tpLens)
-    print(fpLens)
-    #return
-    
-    #These steps will go into a training.py file
-    #allTP = np.vstack(tpList)
-    #allFP = np.vstack(fpList)
-    #testClassifier(allTP, allFP, fieldsList, OUTPUT_ROOT)
+    print('True positives:', tpLens)
+    print('False positives:', fpLens)
 
 if __name__ == "__main__":
     #first set up the arg parser

@@ -17,13 +17,16 @@ else:
 
 SNAKEFILE_PATH = os.path.dirname(os.path.realpath(__file__))+'/TrainingPipeline.smk'
 SNAKEMAKE_CLUSTER_CONFIG = os.path.dirname(os.path.realpath(__file__))+'/cluster.json'
+SNAKEMAKE_PROFILE = "lsf"
 
 def parseSlids(slidStr):
     '''
     This will parse a list of SL##s 
-    @param slidStr - a string containing comma separated slids; "-" is also accepted for ranges; 
-        ex: "SL123456-SL123467,SL333333"; it can also be a filename with same info on lines
-    @return - a list of all slids we need to pull data for
+    @param slidStr - a JSON file, plain text file, or raw string containing sample identifier 
+        raw string ex: "SL123467,SL333333"; if using SL###, then ranges can be used such as "SL123456-SL123467"
+        plain text ex: can be any of the raw string fields, one per line
+        JSON ex: see GIAB_all.json for an example
+    @return - a list of all sample identifiers we need to pull data for
     '''
     ret = []
     if os.path.exists(slidStr):
@@ -51,7 +54,7 @@ def parseSlids(slidStr):
         assert(len(subFrags) <= 2)
         if len(subFrags) == 1:
             #single slid
-            assert(subFrags[0][0:2] == 'SL')
+            #assert(subFrags[0][0:2] == 'SL')
             ret.append(subFrags[0])
         elif len(subFrags) == 2:
             #range of slids
@@ -99,7 +102,7 @@ def sendSlackMessage(channel, message):
 
 if __name__ == "__main__":
     #first set up the arg parser
-    DESC="Wrapper script for running the pipelines"
+    DESC="Wrapper script for running the full training pipeline"
     p = ap.ArgumentParser(description=DESC, formatter_class=ap.RawTextHelpFormatter)
     
     #optional arguments with default
@@ -107,6 +110,7 @@ if __name__ == "__main__":
     p.add_argument('-e', '--model-eli5', dest='model_eli5', action='store_true', default=False, help='get eli5 results for "clinical" models (default: False)')
     p.add_argument('-s', '--summarize-models', dest='summarize_models', action='store_true', default=False, help='summarize model results (default: False)')
     p.add_argument('-t', '--train-models', dest='train_models', action='store_true', default=False, help='train the models using the pipeline structure (default: False)')
+    p.add_argument('-u', '--unlock', dest='unlock', action='store_true', default=False, help='unlock the directory in the event of snakemake failure (default: False)')
     p.add_argument('-x', '--execute', dest='execute', action='store_true', default=False, help='execute the commands (default: False)')
 
     #required main arguments
@@ -115,12 +119,14 @@ if __name__ == "__main__":
     #parse the arguments
     args = p.parse_args()
     
+    #This pipeline assumes snakemake is installed and that it's running on an LSF cluster
     snakemakeFrags = [
         'snakemake',
+        '--profile', SNAKEMAKE_PROFILE,
         '--snakefile', SNAKEFILE_PATH,
         '--cluster-config', SNAKEMAKE_CLUSTER_CONFIG,
-        '--cluster', '"bsub -o {cluster.log} -J {cluster.name} -n {threads} -M {cluster.memory} -R \\"span[hosts=1] rusage[mem={cluster.memory}]\\""',
-        '-j', '5000',
+        #'--cluster', '"bsub -o {cluster.log} -J {cluster.name} -n {threads} -M {cluster.memory} -R \\"span[hosts=1] rusage[mem={cluster.memory}]\\""',
+        #'-j', '5000',
         '--config', 'sampleData="%s"' % (args.slids, ),
         '-p', #always print commands
         '-k', #keep going in the event of partial failure
@@ -129,6 +135,12 @@ if __name__ == "__main__":
     if not args.execute:
         print('Dry run mode: enabled')
         snakemakeFrags.append('-n') #dry-run mode
+    print()
+
+    if args.unlock:
+        print('Unlock: enabled')
+        snakemakeFrags.append('--unlock')
+        buildFrags.append('--unlock')
     print()
     
     buildFrags = []
@@ -164,6 +176,8 @@ if __name__ == "__main__":
             ]
             if SLACK_CHANNEL != None:
                 sendSlackMessage(SLACK_CHANNEL, '\n'.join(slackFrags))
+            else:
+                print('\n'.join(slackFrags))
     else:
         print('WARNING: No snakemake objects were specified to be generated.  Exiting without doing any work.')
     

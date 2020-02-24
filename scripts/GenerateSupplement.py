@@ -364,7 +364,7 @@ def generateReport(dataDict, prefix):
 
 if __name__ == "__main__":
     #first set up the arg parser
-    DESC="A tool for generating our supplementary document for the false positive prediction results."
+    DESC="A tool for generating our supplementary document for the false positive prediction results"
     p = ap.ArgumentParser(description=DESC, formatter_class=ap.RawTextHelpFormatter)
     
     #optional arguments with default
