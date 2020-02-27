@@ -42,3 +42,6 @@ python3 EvaluateVariants.py \
 4. `-v [coordinates]` - comma separated, coordinates list of the form "chr1:1234-1234" for a single nucleotide variant
 5. `[model_directory]` - the directory containing the models file (this will be under the pipeline subfolder)
 5. `[vcf_filename]` - the raw VCF file, make sure it is the same format as the selected model
+
+## License
+For non-commerical use, STEVE is released under the Apache-2.0 License. For commercial use, please contact [jholt@hudsonalpha.org](jholt@hudsonalpha.org).
