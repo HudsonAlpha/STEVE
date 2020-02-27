@@ -7,7 +7,7 @@ REPO_DIRECTORY = '/gpfs/gpfs1/home/jholt/sanger_less_tests'
 
 #a dictionary containing metadata for the samples
 SAMPLE_JSONS = [
-    '%s/scripts/GIAB_all.json' % REPO_DIRECTORY
+    '%s/scripts/GIAB_v1.json' % REPO_DIRECTORY
 ]
 
 #root directory for RTG-based analysis which is expected to conform to a standard directory structure, and contain
