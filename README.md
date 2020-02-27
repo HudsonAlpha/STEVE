@@ -8,6 +8,45 @@ The core idea is to use the Genome in a Bottle Truth Set(s) to gather a collecti
 2. Model training - trains multiple models using the extracted features and reports multiple summary statistics on performance
 3. Variant evaluation - runs the models and predicts whether a variant is a false positive or true positive
 
+## Snakemake Pipeline
+The easiest way to invoke this pipeline is to use the snakemake wrapper script, `RunTrainingPipeline.py`. This will first require some pipeline configuration, sample configuration, and then a final run step.
+
+### Pipeline Configuration
+Inside `PipelineConfig.py` is a set of information describing where files can be found within your environment. Generally, these values need to be set only once during the initial setup. The following are key variables that should be modified:
+
+#### Required
+1. `DATA_DIRECTORY` - The full path to a directory containing pipeline outputs. The pipeline assumes that variant files are located at `{DATA_DIRECTORY}/variant_calls/{aligner}/{caller}/{sample}.vcf.gz`.  Similarly, it assumes that RTG VCFEval outputs are located at `{DATA_DIRECTORY}/rtg_results/{aligner}/{caller}/{sample}`.  Both of these are required for the pipeline to run successfully. NOTE: if using a variant caller that is not specified in `model_metrics.json`, additional steps may be required (see section "Feature Extraction" for details).
+2. `ALIGNERS`, `VARIANT_CALLERS` - Each of these is a list of aligners or variant callers that will be used to populate the paths above (`{aligner}` or `{caller}`). Every combination of the two lists will be used.
+3. `FULL_PIPES` - similar to `ALIGNERS` and `VARIANT_CALLERS`, but this one allows for specific tuple pairs (i.e. instead of every combination).
+
+#### Optional
+1. `THREADS_PER_PROCS` - positive integer, the number of threads to use for training and testing
+2. `LATEX_PATH` - path to a `pdflatex` binary; only required if attempt to generate a supplemental document similar to the one released with the paper
+3. `ENABLE_SLACK_NOTIFICATIONS` - if True, slack notifications will be sent upon pipeline completion
+4. `ENABLED_SLACK_URLS` - a JSON dictionary file where each key is a channel or label and the value is a Slack endpoint URL
+5. `ENABLED_SLACK_CHANNEL` - the specific channel or label in the above JSON to send messages to
+
+### Sample Configuration
+Before running the pipeline, a sample configuration JSON is required (the one used for our paper is in `GIAB_v1.json`).  This JSON file contains a dictionary where each key is a `{sample}` name or label containing a subdictionary with metadata.  Whenever a new sample is added to the training/testing set, this file will need to be updated.
+
+The following fields are optional metadata keys currrently used in the automatic supplemental generation script:
+1. `sample` - the sample source; currently expected to be one of: `NA12878`, `HG002`, `HG003`, `HG004`, or `HG005`
+2. `prep` - a string describing the preparation method of the data; e.g. "Clinical PCR" or "PacBio CCS"
+
+### Cluster Configuration
+We have currently configured the pipeline to run using an LSF cluster.  If a different cluster type is to be used (or run locally), then several modification may be necessary to the `RunTrainingPipeline.py` script itself. Note that these changes should only have to be made when switching to a different execution environment.  We attempt to describe the possible changes below:
+1. `SNAKEMAKE_PROFILE` - we assume that the user has a [Snakemake profile](https://github.com/Snakemake-Profiles/doc) which has configured how/where to run snakemake jobs.  Once created, the value of this variable is the string (e.g. `lsf`) describing the profile.
+2. If running locally, configuration changes to the snakemake command itself may be necessary. These are located in variable `snakemakeFrags`, contact the repo owner or submit a ticket for assistance.
+
+### Running the Pipeline
+Assuming the above configuration steps were successful, all that remains is to run the pipeline itself.  Here is an example execution of the pipeline used in the paper:
+
+```
+python3 scripts/RunTrainingPipeline.py -d -e -s -t -x ./GIAB_v1.json
+```
+
+For details on each option, run `python3 RunTrainingPipeline.py -h`.  The following sections describe what the pipeline is actually doing.
+
 ## Feature Extraction
 The first step is to extract features from the true positive and false positive variant calls. Currently, any new "pipeline" (consisting of an aligner and a variant caller) will require its own set of features. This is because each variant caller produces its own set of metrics, many of which are not shared between callers. Additionally, the method by which the metrics are calculated may vary from caller to caller. The scripts in this pipeline assume that the full "pipeline" has already been run and the outputs are in a standardized location. Whenever a new variant caller is used, there may be multiple updates necessary to handle the caller.  Here is the summary of where to check:
 
@@ -23,7 +62,7 @@ python3 RunTrainingPipeline.py -t -x [samples.json]
 ```
 
 ## Variant Evaluation
-The following command will actually use the trained models to evaluate variant calls:
+The following command will actually use the trained models to evaluate variant calls present in a VCF file:
 
 ```
 python3 EvaluateVariants.py \
