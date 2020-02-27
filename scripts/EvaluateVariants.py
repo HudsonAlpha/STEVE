@@ -152,6 +152,8 @@ def runSubType(variantType, args, stats, models, statKey):
         evalList = [bestModelName]
     
     elif modelName == 'clinical':
+        #TODO: make this a script parameter instead of hard-coding
+        #this contains minimum acceptable recals for a given target
         targetThresholds = {
             '0.995' : 0.99
         }
