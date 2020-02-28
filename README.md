@@ -75,8 +75,8 @@ python3 EvaluateVariants.py \
 ```
 
 ### Parameter Notes
-1. `-m [model]` - the model can be "clinical", "best", "all", or a specific model name (see "all" for the options); "clinical" will use a model with defined clinical criteria inside the script; "all" will use every model available; "best" will select the model with the lowest final FPR at the selected evaluation threshold (NOTE: this may be undesirable for variant types with low training/testing volume)
-2. `-r [recall]` - currently accepts values from the "0.99", "0.995", "0.999", and "1.0"
+1. `-m [model]` - the model can be "clinical", "all", or a specific model name (see "all" for the options); "clinical" will use a model with defined clinical criteria inside the script; "all" will use every model available; "best" will select the model with the lowest final FPR at the selected evaluation threshold (NOTE: this may be undesirable for variant types with low training/testing volume)
+2. `-r [recall]` - for "clinical", this is the target recall (minimum is defined inside the script currently); for other `[model]` parameters, this is the evaluation recall
 3. `-c [codicem]` - a Codicem Sanger download file with variants to evaluate
 4. `-v [coordinates]` - comma separated, coordinates list of the form "chr1:1234-1234" for a single nucleotide variant
 5. `[model_directory]` - the directory containing the models file (this will be under the pipeline subfolder)
