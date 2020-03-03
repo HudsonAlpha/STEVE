@@ -33,21 +33,22 @@ def loadMetadata():
         md.update(d)
     return md
 
-def getModelResults(aligner, caller):
+def getModelResults(pipeline, aligner, caller):
     '''
     This will pull ALL the results for an aligner/caller combination and put it in a dictionary to be
     later consumed by Jinja2.
+    @param pipeline - the pipeline subdirectory
     @param aligner - the aligner to get information for
     @param caller - the caller to get information for
     @return - a dictionary values for use by Jinja2
     '''
     #get all the RTG-specific results for this aligner/caller combo
-    rtgResults = getRtgResults(aligner, caller)
+    rtgResults = getRtgResults(pipeline, aligner, caller)
 
     #get all the training results for this aligner/caller combo
-    trainingResults = getTrainingResults(aligner, caller)
-    strictResults = getTrainingResults(aligner, caller, True)
-    eli5Results = getEli5Results(aligner, caller)
+    trainingResults = getTrainingResults(pipeline, aligner, caller)
+    strictResults = getTrainingResults(pipeline, aligner, caller, True)
+    eli5Results = getEli5Results(pipeline, aligner, caller)
 
     retDict = {
         'ALIGNER' : aligner,
@@ -59,9 +60,10 @@ def getModelResults(aligner, caller):
     }
     return retDict
 
-def getRtgResults(aligner, caller):
+def getRtgResults(pipeline, aligner, caller):
     '''
     This will load results specific to the RTG evaluation, things like number of TP, TN, etc.
+    @param pipeline - the pipeline subdirectory (usually "pipeline")
     @param aligner - the aligner to get information for
     @param caller - the caller to get information for
     @return - a dictionary values for use by Jinja2
@@ -99,7 +101,7 @@ def getRtgResults(aligner, caller):
     retDict['TOTAL_SUMMARY'] = totalDict
 
     #get the feature stats
-    summaryFN = '%s/pipeline/feature_stats/%s/%s/feature_stats.tsv' % (REPO_DIRECTORY, aligner, caller)
+    summaryFN = '%s/%s/feature_stats/%s/%s/feature_stats.tsv' % (REPO_DIRECTORY, pipeline, aligner, caller)
     if os.path.exists(summaryFN):
         featureDict = {}
         fp = open(summaryFN, 'r')
@@ -169,9 +171,10 @@ def loadRtgSummary(fn):
         resultsDict[h] = val
     return resultsDict
 
-def getTrainingResults(aligner, caller, strict=False):
+def getTrainingResults(pipeline, aligner, caller, strict=False):
     '''
     This will retrieve training results for the specified aligner/caller combo
+    @param pipeline - the pipeline subdirectory
     @param aligner - the aligner specified
     @param caller - the caller specified
     @param strict - if True, load the strict version of the results
@@ -179,9 +182,9 @@ def getTrainingResults(aligner, caller, strict=False):
     '''
     #pull the summary results and parse the clinical fragments
     if not strict:
-        summaryFN = '%s/pipeline/model_summaries/%s/%s/model_summary.tsv' % (REPO_DIRECTORY, aligner, caller)
+        summaryFN = '%s/%s/model_summaries/%s/%s/model_summary.tsv' % (REPO_DIRECTORY, pipeline, aligner, caller)
     else:
-        summaryFN = '%s/pipeline/model_summaries/%s/%s/strict_summary.tsv' % (REPO_DIRECTORY, aligner, caller)
+        summaryFN = '%s/%s/model_summaries/%s/%s/strict_summary.tsv' % (REPO_DIRECTORY, pipeline, aligner, caller)
     clinicalResults = {}
     fp = open(summaryFN, 'r')
 
@@ -208,7 +211,7 @@ def getTrainingResults(aligner, caller, strict=False):
                 continue
             
             reformKey = VAR_TRANSLATE[vt]+'_'+GT_TRANSLATE[gt]
-            imageFN = '%s/pipeline/model_summaries/%s/%s/roc_curves/%s.png' % (REPO_DIRECTORY, aligner, caller, reformKey)
+            imageFN = '%s/%s/model_summaries/%s/%s/roc_curves/%s.png' % (REPO_DIRECTORY, pipeline, aligner, caller, reformKey)
             if os.path.exists(imageFN):
                 imageDict[reformKey] = imageFN
             else:
@@ -222,14 +225,15 @@ def getTrainingResults(aligner, caller, strict=False):
     }
     return ret
 
-def getEli5Results(aligner, caller):
+def getEli5Results(pipeline, aligner, caller):
     '''
     This will retrieve ELI5 results if available
+    @param pipeline - the pipeline subdirectory
     @param aligner - the aligner specified
     @param caller - the caller specified
     @return - a dictionary of metrics for this combo
     '''
-    jsonFN = '%s/pipeline/eli5_summaries/%s/%s/model_eli5.json' % (REPO_DIRECTORY, aligner, caller)
+    jsonFN = '%s/%s/eli5_summaries/%s/%s/model_eli5.json' % (REPO_DIRECTORY, pipeline, aligner, caller)
 
     #catch the situation where we didn't run ELI5 for w/e reason
     ret = {}
@@ -368,7 +372,7 @@ if __name__ == "__main__":
     p = ap.ArgumentParser(description=DESC, formatter_class=ap.RawTextHelpFormatter)
     
     #optional arguments with default
-    #p.add_argument('--l1', dest='label1', default=None, help='the label for the first input (default: same as "oldJson")')
+    p.add_argument('-p', '--pipeline-subdir', dest='pipeline', default='pipeline', help='the subdirectory containing the outputs (default: "pipeline"')
     
     #required main arguments
     p.add_argument('outPrefix', type=str, help='the path-prefix for all output files (ex: "/path/to/final")')
@@ -403,13 +407,13 @@ if __name__ == "__main__":
 
     for aligner, caller in combos:
         #check for the summary file
-        summaryFN = '%s/pipeline/model_summaries/%s/%s/model_summary.tsv' % (REPO_DIRECTORY, aligner, caller)
+        summaryFN = '%s/%s/model_summaries/%s/%s/model_summary.tsv' % (REPO_DIRECTORY, args.pipeline, aligner, caller)
         if not os.path.exists(summaryFN):
             print('WARNING: Summary file for %s/%s was not found, re-run pipeline?')
             continue
 
         #get the results
-        comboData = getModelResults(aligner, caller)
+        comboData = getModelResults(args.pipeline, aligner, caller)
         
         #rename
         comboData['ALIGNER_LABEL'] = ALIGNER_RENAMING.get(aligner, aligner)
