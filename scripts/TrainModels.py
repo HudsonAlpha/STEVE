@@ -30,6 +30,50 @@ from RunTrainingPipeline import parseSlids
 EXACT_MODE = 0
 GRID_MODE = 1
 
+#now enumerate the models as a tuple (
+#   label - just a str label for outputs
+#   default classifier - the base classifier we would use if CV is disabled
+#   cross validation params - a dictionary of parameters to test during cross-validation
+# )
+# NOTE: some params have been pruned because they were very, very rarely selected during CV 
+# and we want to reduce run-time when possible
+CLASSIFIERS = [
+    ('RandomForest', RandomForestClassifier(random_state=0, class_weight='balanced', max_depth=4, n_estimators=200, min_samples_split=2, max_features='sqrt'),
+    {
+        'random_state' : [0],
+        'class_weight' : ['balanced'],
+        'n_estimators' : [200, 300], #prior tests: 4
+        'max_depth' : [4, 5], #prior tests: 3
+        'min_samples_split' : [2],
+        'max_features' : ['sqrt']
+    }),
+    #"The most important parameters are base_estimator, n_estimators, and learning_rate" - https://chrisalbon.com/machine_learning/trees_and_forests/adaboost_classifier/
+    ('AdaBoost', AdaBoostClassifier(random_state=0, algorithm='SAMME.R', learning_rate=1.0, base_estimator=DecisionTreeClassifier(max_depth=2), n_estimators=200),
+    {
+        'random_state' : [0],
+        'base_estimator' : [DecisionTreeClassifier(max_depth=2)], #prior tests: SVC(probability=True)
+        'n_estimators' : [200, 300], #prior tests: 100
+        'learning_rate' : [0.1, 1.0], #prior tests: 0.01
+        'algorithm' : ['SAMME.R'] #prior tests: "SAMME"; didn't seem to matter much and SAMME.R is faster
+    }),
+    #" Most data scientist see number of trees, tree depth and the learning rate as most crucial parameters" - https://www.datacareer.de/blog/parameter-tuning-in-gradient-boosting-gbm/
+    ('GradientBoosting', GradientBoostingClassifier(random_state=0, learning_rate=0.1, loss='exponential', max_depth=4, max_features='sqrt', n_estimators=200),
+    {
+        'random_state' : [0],
+        'n_estimators' : [200], #prior tests: 100
+        'max_depth' : [4], #prior tests: 3
+        'learning_rate' : [0.1, 0.2], #prior tests: 0.05
+        'loss' : ['exponential'], #prior tests: 'deviance' #just never seemed to out-perform exponential *shrug*
+        'max_features' : ['sqrt'],
+        'subsample' : [0.5, 1.0] #TODO: this could lead to performance increase, should try in future revisions
+    }),
+    ('EasyEnsemble', EasyEnsembleClassifier(random_state=0, n_estimators=50),
+    {
+        'random_state' : [0],
+        'n_estimators' : [40, 50, 75, 100] #prior tests: 10, 20, 30
+    })
+]
+
 def trainModels(featureDir, slids, outPrefix, splitByType, numProcs):
     '''
     Trains models given a selection of features
@@ -243,47 +287,9 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
 
     #TODO: future possible optimization - RandomForest and EasyEnsemble have a "n_jobs" parameters for parallel 
     # fit/predict; is there a way we can utilize that in general?
-
-    #now enumerate the models
-    classifiers = [
-        ('RandomForest', RandomForestClassifier(random_state=0, class_weight='balanced', max_depth=4, n_estimators=200, min_samples_split=2, max_features='sqrt'),
-        {
-            'random_state' : [0],
-            'class_weight' : ['balanced'],
-            'n_estimators' : [100, 200],
-            'max_depth' : [3, 4],
-            'min_samples_split' : [2],
-            'max_features' : ['sqrt']
-        }),
-        #"The most important parameters are base_estimator, n_estimators, and learning_rate" - https://chrisalbon.com/machine_learning/trees_and_forests/adaboost_classifier/
-        ('AdaBoost', AdaBoostClassifier(random_state=0, algorithm='SAMME', learning_rate=1.0, base_estimator=DecisionTreeClassifier(max_depth=2), n_estimators=200),
-        {
-            'random_state' : [0],
-            'base_estimator' : [DecisionTreeClassifier(max_depth=2)],#, SVC(probability=True)],
-            'n_estimators' : [100, 200],
-            'learning_rate' : [0.01, 0.1, 1.0],
-            'algorithm' : ['SAMME', 'SAMME.R']
-        }),
-        #" Most data scientist see number of trees, tree depth and the learning rate as most crucial parameters" - https://www.datacareer.de/blog/parameter-tuning-in-gradient-boosting-gbm/
-        ('GradientBoosting', GradientBoostingClassifier(random_state=0, learning_rate=0.1, loss='exponential', max_depth=4, max_features='sqrt', n_estimators=200),
-        {
-            'random_state' : [0],
-            'n_estimators' : [100, 200],
-            'max_depth' : [3, 4],
-            'learning_rate' : [0.05, 0.1, 0.2],
-            'loss' : ['deviance', 'exponential'],
-            'max_features' : ['sqrt'],
-            #'subsample' : [0.5, 1.0] #TODO: this could lead to performance increase, should try in future revisions
-        }),
-        ('EasyEnsemble', EasyEnsembleClassifier(random_state=0, n_estimators=50),
-        {
-            'random_state' : [0],
-            'n_estimators' : [10, 20, 30, 40, 50]
-        })
-    ]
     
     #go through each model, one at a time
-    for (label, raw_clf, hyperparameters) in classifiers:
+    for (label, raw_clf, hyperparameters) in CLASSIFIERS:
         print('[%s] Starting training for %s...' % (str(datetime.datetime.now()), label))
         
         #this will do training and/or GridSearchCV for us
