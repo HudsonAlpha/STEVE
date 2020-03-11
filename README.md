@@ -45,21 +45,26 @@ Assuming the above configuration steps were successful, all that remains is to r
 python3 scripts/RunTrainingPipeline.py -d -e -s -t -x ./GIAB_v1.json
 ```
 
-For details on each option, run `python3 RunTrainingPipeline.py -h`.  The following sections describe what the pipeline is actually doing.
+For details on each option, run `python3 scripts/RunTrainingPipeline.py -h`.  The following sections describe what the pipeline is actually doing.
+
+## Sample Stats (Optional)
+This optional step will gather true and false positive call counts from the feature and format them into a tab-delimited output format.  It will look through a given features folder and identify all available samples automatically.  The script `scripts/PrintDataReport.py` performs these steps and is automatically invoked with the `-d` option of `scripts/RunTrainingPipeline.py`. 
 
 ## Feature Extraction
-The first step is to extract features from the true positive and false positive variant calls. Currently, any new "pipeline" (consisting of an aligner and a variant caller) will require its own set of features. This is because each variant caller produces its own set of metrics, many of which are not shared between callers. Additionally, the method by which the metrics are calculated may vary from caller to caller. The scripts in this pipeline assume that the full "pipeline" has already been run and the outputs are in a standardized location. Whenever a new variant caller is used, there may be multiple updates necessary to handle the caller.  Here is the summary of where to check:
+The first main step is to extract features from the true positive and false positive variant calls. Currently, any new "pipeline" (consisting of an aligner and a variant caller) will require its own set of features. This is because each variant caller produces its own set of metrics, many of which are not shared between callers. Additionally, the method by which the metrics are calculated may vary from caller to caller. The scripts in this pipeline assume that the full "pipeline" has already been run and the outputs are in a standardized location. Whenever a new variant caller is used, there may be multiple updates necessary to handle the caller.  Here is the summary of where to check:
 
 1. Check `scripts/model_metrics.json` to determine whether a newly-defined model should be made or an old one copied.
 2. If any new statistics need to be copied, they should be added to the appropriate `CALL` or `INFO` sections in the file.  Updates to the `scripts/ExtractFeatures.py` may be necessary.
 3. If any new `MUNGED` statistics are added, the code within `scripts/ExtractFeatures.py`, function `getVariantFeatures(...)` will need to be modified to handle a custom-processed feature.
 
 ## Model Training
-Once the features are extracted for a model, the data is split at a 50:50 ratio in training and testing datasets while preserving sample labels.  The training data is then used for a leave-one-sample-out cross-validation (CV) that also performs hyperparameter selection simultaneously. After CV is complete, the final model is trained on the entire training set and evaluated on the entire testing set. The following command will run the full training pipeline (feature extraction and model training) for all aligners and callers:
+Once the features are extracted for a model, the data is split at a 50:50 ratio in training and testing datasets while preserving sample labels.  The training data is then used for a leave-one-sample-out cross-validation (CV) that also performs hyperparameter selection simultaneously. After CV is complete, the final model is trained on the entire training set and evaluated on the entire testing set. The script `scripts/TrainModels.py` performs all these steps and is automatically invoked with the `-t` option of `scripts/RunTrainingPipeline.py`.
 
-```
-python3 RunTrainingPipeline.py -t -x [samples.json]
-```
+## Model Evaluation (Optional)
+This optional step will gather feature importance results from the trained clinical models (a minimum and target recall must be specified).  The script `scripts/ExtractELI5Results.py` performs these steps and is automatically invoked with the `-e` option of `scripts/RunTrainingPipeline.py`. 
+
+## Summarized Results (Optional)
+This optional step will gather summary results for the final models and print the results in a tab-delimited format.  It includes the best results for each model type evaluated and a summary at the bottom indicating which models were selected for a set of clinical criteria.  The script `scripts/PrintModelReport.py` performs these steps and is automatically invoked for our clinical criteria and a strict criteria with the `-s` option of `scripts/RunTrainingPipeline.py`. 
 
 ## Variant Evaluation
 The following command will actually use the trained models to evaluate variant calls present in a VCF file:
@@ -78,7 +83,7 @@ python3 EvaluateVariants.py \
 1. `-m [model]` - the model can be "clinical", "all", or a specific model name (see "all" for the options); "clinical" will use a model with defined clinical criteria inside the script; "all" will use every model available; "best" will select the model with the lowest final FPR at the selected evaluation threshold (NOTE: this may be undesirable for variant types with low training/testing volume)
 2. `-r [recall]` - for "clinical", this is the target recall (minimum is defined inside the script currently); for other `[model]` parameters, this is the evaluation recall
 3. `-c [codicem]` - a Codicem Sanger download file with variants to evaluate
-4. `-v [coordinates]` - comma separated, coordinates list of the form "chr1:1234-1234" for a single nucleotide variant
+4. `-v [coordinates]` - comma separated, coordinates list of the form "chr1:1234-1234" for the variants; all variants within a given range will be evaluated
 5. `[model_directory]` - the directory containing the models file (this will be under the pipeline subfolder)
 5. `[vcf_filename]` - the raw VCF file, make sure it is the same format as the selected model
 
