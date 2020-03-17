@@ -93,7 +93,7 @@ After full training, the models are evaluated on the unseen test dataset. Any ca
     \item Let $S_m=0.99$ be the minimum acceptable sensitivity and $S_t=0.995$ be the target sensitivity for the models.
     \item For each candidate model, let $S$ be the final sensitivity and $F$ be the final false positive rate (FPR) for the model.
     \item Calculate the scaled sensitivity score, that is at most 1.0 (representing a model reaching the target sensitivity): $S_s = min(1.0, {S - S_m \over S_t - S_m})$
-    \item Calculate the true negative rate, $T = 1.0-F$, such that higher values indicate fewer true variant calls being incorrectly sent for confirmation.
+    \item Calculate the specificity (true negative rate), $T = 1.0-F$, such that higher values indicate fewer true variant calls being incorrectly sent for confirmation.
     \item Calculate the modified F1 score: $F = harmonic\_mean(S_s, T)$
     \item Of the remaining models, select the model with the highest F1 score, $F$, for use clinically.
 \end{enumerate}
