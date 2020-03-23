@@ -1,0 +1,57 @@
+{
+    "SL362490" : {
+        "sample" : "NA12878",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL362491" : {
+        "sample" : "NA12878",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL362492" : {
+        "sample" : "NA12878",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL409548" : {
+        "sample" : "HG002",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL421649" : {
+        "sample" : "HG002",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL409549" : {
+        "sample" : "HG003",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL421650" : {
+        "sample" : "HG003",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL409550" : {
+        "sample" : "HG004",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL421651" : {
+        "sample" : "HG004",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL409551" : {
+        "sample" : "HG005",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    },
+    "SL421652" : {
+        "sample" : "HG005",
+        "prep" : "Clinical PCR",
+        "analysis" : ["all"]
+    }
+}

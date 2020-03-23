@@ -4,6 +4,7 @@ import argparse as ap
 import bisect
 import datetime
 import json
+from json import JSONEncoder
 import numpy as np
 import pickle
 
@@ -21,14 +22,18 @@ from sklearn.model_selection import train_test_split
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.utils import shuffle
+from skopt import BayesSearchCV
+from skopt.space import Real, Categorical, Integer
+from xgboost import XGBClassifier
 
 #custom imports
-from ExtractFeatures import VAR_SNP, VAR_INDEL, GT_REF_HET, GT_ALT_HOM, GT_HET_HET, GT_REF_HOM
+from ExtractFeatures import VAR_SNP, VAR_INDEL, GT_REF_HET, GT_ALT_HOM, GT_HET_HET, GT_REF_HOM, DEFAULT_MISSING
 from RunTrainingPipeline import parseSlids
 
 #define the training modes here
 EXACT_MODE = 0
 GRID_MODE = 1
+BAYES_MODE = 2
 
 #now enumerate the models as a tuple (
 #   label - just a str label for outputs
@@ -42,10 +47,20 @@ CLASSIFIERS = [
     {
         'random_state' : [0],
         'class_weight' : ['balanced'],
-        'n_estimators' : [200, 300], #prior tests: 4
+        'n_estimators' : [200, 300], #prior tests: 100
         'max_depth' : [4, 5], #prior tests: 3
         'min_samples_split' : [2],
         'max_features' : ['sqrt']
+    },
+    {
+        #Best params: TODO, overfit the first time by a lot
+        #ROC AUC: TODO, see above
+        'random_state' : Categorical([0]),
+        'class_weight' : Categorical(['balanced']),
+        'n_estimators' : Integer(200, 500),
+        'max_depth' : Integer(1, 8), 
+        'min_samples_split' : Real(0.00001, 0.5, prior='uniform'),
+        'max_features' : Categorical(['sqrt'])
     }),
     #"The most important parameters are base_estimator, n_estimators, and learning_rate" - https://chrisalbon.com/machine_learning/trees_and_forests/adaboost_classifier/
     ('AdaBoost', AdaBoostClassifier(random_state=0, algorithm='SAMME.R', learning_rate=1.0, base_estimator=DecisionTreeClassifier(max_depth=2), n_estimators=200),
@@ -55,7 +70,17 @@ CLASSIFIERS = [
         'n_estimators' : [200, 300], #prior tests: 100
         'learning_rate' : [0.1, 1.0], #prior tests: 0.01
         'algorithm' : ['SAMME.R'] #prior tests: "SAMME"; didn't seem to matter much and SAMME.R is faster
+    },
+    {
+        #Best params: OrderedDict([('algorithm', 'SAMME.R'), ('base_estimator', DecisionTreeClassifier(max_depth=3), ('learning_rate', 0.06563659204257402), ('n_estimators', 426), ('random_state', 0)])
+        #ROC AUC: 0.999353
+        'random_state' : Categorical([0]),
+        'base_estimator' : Categorical([DecisionTreeClassifier(max_depth=2), DecisionTreeClassifier(max_depth=3)]), #prior tests: SVC(probability=True)
+        'n_estimators' : Integer(300, 500), #prior tests: 100
+        'learning_rate' : Real(0.0001, 1.0, prior='log-uniform'), #prior tests: 0.01
+        'algorithm' : Categorical(['SAMME.R']) #prior tests: "SAMME"; didn't seem to matter much and SAMME.R is faster
     }),
+    #TODO: add min_sample_split and/or min_samples_leaf to the GradientBoosting and XGBClassifiers
     #" Most data scientist see number of trees, tree depth and the learning rate as most crucial parameters" - https://www.datacareer.de/blog/parameter-tuning-in-gradient-boosting-gbm/
     ('GradientBoosting', GradientBoostingClassifier(random_state=0, learning_rate=0.1, loss='exponential', max_depth=4, max_features='sqrt', n_estimators=200),
     {
@@ -66,13 +91,56 @@ CLASSIFIERS = [
         'loss' : ['exponential'], #prior tests: 'deviance' #just never seemed to out-perform exponential *shrug*
         'max_features' : ['sqrt'],
         'subsample' : [0.5, 1.0] #TODO: this could lead to performance increase, should try in future revisions
+    },
+    {
+        'random_state' : Categorical([0]),
+        'n_estimators' : Integer(200, 500), #prior tests: 100
+        'max_depth' : Integer(1, 8), #prior tests: 3
+        'learning_rate' : Real(0.0001, 0.5, prior='log-uniform'), #prior tests: 0.05
+        'loss' : Categorical(['exponential']), #prior tests: 'deviance' #just never seemed to out-perform exponential *shrug*
+        'max_features' : Categorical(['sqrt']),
+        'subsample' : Real(0.01, 1.0, prior='uniform') #TODO: this could lead to performance increase, should try in future revisions
+    }),
+    ('XGBClassifier', XGBClassifier(random_state=0),
+    {
+        'random_state' : [0],
+        'n_estimators' : [200], #default=100; prior tests: 100
+        'max_depth' : [5, 6], #default=6; prior tests: 3, 4
+        'learning_rate' : [0.1, 0.2], #default=0.3; prior tests: 0.3
+        'subsample' : [0.5, 1.0], #default=1
+        'tree_method' : ['approx'], #default=auto; prior tests: "hist"
+        'objective' : ['binary:logistic', 'binary:logitraw'], #default=binary:logistic; prior tests 'binary:hinge'
+        'missing' : [DEFAULT_MISSING] #NOTE: seems to be the only method that explicitly has a missing field; seems best practice to set it
+    },
+    {
+        'random_state' : Categorical([0]),
+        'n_estimators' : Integer(200, 500), #default=100; prior tests: 100
+        'max_depth' : Integer(1, 8), #default=6; prior tests: 3, 4
+        'learning_rate' : Real(0.0001, 0.5, prior='log-uniform'), #default=0.3; prior tests: 0.3
+        'subsample' : Real(0.01, 1.0, prior='uniform'), #default=1
+        'tree_method' : Categorical(['approx']), #default=auto; prior tests: "hist"
+        'objective' : Categorical(['binary:logistic', 'binary:logitraw']), #default=binary:logistic; prior tests 'binary:hinge'
+        'missing' : Categorical([DEFAULT_MISSING]) #NOTE: seems to be the only method that explicitly has a missing field; seems best practice to set it
     }),
     ('EasyEnsemble', EasyEnsembleClassifier(random_state=0, n_estimators=50),
     {
         'random_state' : [0],
         'n_estimators' : [40, 50, 75, 100] #prior tests: 10, 20, 30
+    },
+    {
+        'random_state' : Categorical([0]),
+        'n_estimators' : Integer(10, 100) #prior tests: 10, 20, 30
     })
 ]
+
+class NumpyEncoder(JSONEncoder):
+    def default(self, obj):
+        #in the event you have to add these in the future: model the np.float32 instance for single value types
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, np.float32):
+            return obj.item()
+        return JSONEncoder.default(self, obj)
 
 def trainModels(featureDir, slids, outPrefix, splitByType, numProcs):
     '''
@@ -145,7 +213,7 @@ def trainModels(featureDir, slids, outPrefix, splitByType, numProcs):
     jsonFN = '%s/stats.json' % (outPrefix, )
     print('[%s] Saving stats to "%s"...' % (str(datetime.datetime.now()), jsonFN))
     fp = open(jsonFN, 'w+')
-    json.dump(results, fp, indent=4, sort_keys=True)
+    json.dump(results, fp, indent=4, sort_keys=True, cls=NumpyEncoder)
     fp.close()
 
     modelPickleFN = '%s/models.p' % (outPrefix, )
@@ -183,22 +251,29 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
 
     #parameters we will use for all training
     configuration = {
-        'TRAINING_MODE' : GRID_MODE,
+        'TRAINING_MODE' : BAYES_MODE,
         'USE_SUBSET' : False, #if True, restricts input size to "SUBSET_SIZE" for each sample
-        'SUBSET_SIZE' : 100000, #this only matter if USE_SUBSET is True
+        'SUBSET_SIZE' : 1000, #this only matter if USE_SUBSET is True
+        'TEST_FRACTION' : 0.75,
         'FILTER_VARIANTS_BY_TYPE' : filterEnabled,
         'FILTER_VAR_TYPE' : variantType,
         'FILTER_CALL_TYPE' : callType,
         'MANUAL_FS' : True,
         'FLIP_TP' : True,
-        'NUM_PROCESSES' : numProcs
+        'NUM_PROCESSES' : numProcs,
+        'NUM_GROUPS' : len(raw_tpList)
     }
     
     FILTER_VARIANTS_BY_TYPE = configuration['FILTER_VARIANTS_BY_TYPE'] #if True, filter down to a particular type of variant (see next two configs)
     FILTER_VAR_TYPE = configuration['FILTER_VAR_TYPE']#set the type of variant to allow through
     FILTER_CALL_TYPE = configuration['FILTER_CALL_TYPE'] #set the call of the variant to allow through
     MANUAL_FS = configuration['MANUAL_FS'] #if True, manually remove some features that are generally useless
-    
+
+    #the fraction to use for testing, 1-this is the fraction used for training
+    #NOTE: raising this will reduce training time but could get worse performance since it's trained on fewer things
+    # but lowering might be necessary to get reasonable training times in the future, especially as we add more datasets to CV
+    TEST_FRACTION = configuration['TEST_FRACTION'] 
+        
     #do all filtering at this stage for ease downstream
     REMOVED_LABELS = []
     if FILTER_VARIANTS_BY_TYPE:
@@ -255,7 +330,6 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
             fpVals = fpVals[:SUBSET_SIZE]
 
         #now we need to pull out final train/test sets
-        TEST_FRACTION = 0.5
         combined_X = np.vstack([tpVals, fpVals])
         combined_Y = np.array([1]*tpVals.shape[0] + [0]*fpVals.shape[0])
         if FLIP_TP:
@@ -289,11 +363,15 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
     # fit/predict; is there a way we can utilize that in general?
     
     #go through each model, one at a time
-    for (label, raw_clf, hyperparameters) in CLASSIFIERS:
+    for (label, raw_clf, hyperparameters, rangeHyperparams) in CLASSIFIERS:
         print('[%s] Starting training for %s...' % (str(datetime.datetime.now()), label))
         
         #this will do training and/or GridSearchCV for us
-        fullClf, sumRet, sumRocRet = trainClassifier(raw_clf, hyperparameters, final_train_X, final_train_Y, final_train_groups, configuration)
+        if CURRENT_MODE == BAYES_MODE:
+            passParams = rangeHyperparams
+        else:
+            passParams = hyperparameters
+        fullClf, sumRet, sumRocRet = trainClassifier(raw_clf, passParams, final_train_X, final_train_Y, final_train_groups, configuration)
 
         #this is the test on the held out test set
         print('[%s]\tFull testing classifier...' % (str(datetime.datetime.now()), ))
@@ -335,18 +413,31 @@ def trainClassifier(raw_clf, hyperparameters, train_X, train_Y, train_groups, co
     #CONFIGURATION
     CURRENT_MODE = configuration.get('TRAINING_MODE', EXACT_MODE) #set the type of analysis we are doing
     NUM_PROCESSES = configuration.get('NUM_PROCESSES', 1)
+    NUM_GROUPS = configuration.get('NUM_GROUPS', 1)
     #END-CONFIGURATION
 
     if CURRENT_MODE == EXACT_MODE:
         print('[%s]\t\tRunning in EXACT_MODE with training only' % (str(datetime.datetime.now()), ))
         clf = raw_clf
         clf.fit(train_X, train_Y)
-    elif CURRENT_MODE == GRID_MODE:
-        print('[%s]\t\tRunning in GRID_MODE with cross-validation, hyperparameter tuning, and training' % (str(datetime.datetime.now()), ))
+    elif CURRENT_MODE in [GRID_MODE, BAYES_MODE]:
         cv = LeaveOneGroupOut()
-        scoringMode = 'roc_auc'
         #scoringMode = 'average_precision' #very little difference, but this one was less consistent
-        gsClf = GridSearchCV(raw_clf, hyperparameters, cv=cv, scoring=scoringMode, n_jobs=NUM_PROCESSES, verbose=1)
+        scoringMode = 'roc_auc'
+        if CURRENT_MODE == GRID_MODE:
+            print('[%s]\t\tRunning in GRID_MODE with cross-validation, hyperparameter tuning, and training' % (str(datetime.datetime.now()), ))
+            gsClf = GridSearchCV(raw_clf, hyperparameters, cv=cv, scoring=scoringMode, n_jobs=NUM_PROCESSES, verbose=1)
+        elif CURRENT_MODE == BAYES_MODE:
+            print('[%s]\t\tRunning in BAYES_MODE with cross-validation, hyperparameter tuning, and training' % (str(datetime.datetime.now()), ))
+            NUM_ITERATIONS = 30
+            parallelPoints = max(1, int(np.floor(NUM_PROCESSES / NUM_GROUPS)))
+            gsClf = BayesSearchCV(raw_clf, hyperparameters, 
+                cv=cv, scoring=scoringMode, 
+                n_jobs=NUM_PROCESSES, n_iter=NUM_ITERATIONS, n_points=parallelPoints,
+                random_state=0, verbose=1
+            )
+        else:
+            raise Exception('NO_IMPL')
         gsClf.fit(train_X, train_Y, train_groups)
         print('[%s]\t\tBest params: %s' % (str(datetime.datetime.now()), gsClf.best_params_))
         
@@ -366,7 +457,7 @@ def trainClassifier(raw_clf, hyperparameters, train_X, train_Y, train_groups, co
     
     if CURRENT_MODE == EXACT_MODE:
         return clf, [], []
-    elif CURRENT_MODE == GRID_MODE:
+    elif CURRENT_MODE in [GRID_MODE, BAYES_MODE]:
         return clf, sumRet, sumRocRet
     else:
         raise Exception('NO_IMPL')
@@ -495,7 +586,7 @@ if __name__ == "__main__":
 
     #required main arguments
     p.add_argument('feature_dir', type=str, help='directory containing extracted features')
-    p.add_argument('slids', type=str, help='the list of slids separate by commas (ex: "SL123456-SL123467,SL333333")')
+    p.add_argument('slids', type=str, help='the list of slids separate by commas (ex: "SL123456-SL123467,SL333333") or a json file containing sample information')
     p.add_argument('output_prefix', type=str, help='prefix to save output files to')
 
     #parse the arguments
