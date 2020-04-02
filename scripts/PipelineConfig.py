@@ -27,14 +27,14 @@ VARIANT_CALLERS = [
 ]
 
 #if you have specific pipelines (i.e. non-pairs, or maybe externally generated), make the appropriate directory 
-# structure and hard-code them here
+# structure (see note above) and hard-code them here
 FULL_PIPES = [
     ('dragen-07.011.352.3.2.8b', 'dragen-07.011.352.3.2.8b'),
     ('clinical_sentieon-201808.07', 'strelka-2.9.10')
 ]
 
 #pipeline parameters, thread count currently only applies to the actual model training (CV to be precise)
-THREADS_PER_PROC = 32 #was 16 in v1
+THREADS_PER_PROC = 33 #was 16 in v1
 
 ############################################################
 #Documentation config
