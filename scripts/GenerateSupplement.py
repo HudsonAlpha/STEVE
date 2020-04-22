@@ -33,7 +33,7 @@ def loadMetadata():
         md.update(d)
     return md
 
-def getModelResults(pipeline, aligner, caller):
+def getModelResults(datasets, pipeline, aligner, caller):
     '''
     This will pull ALL the results for an aligner/caller combination and put it in a dictionary to be
     later consumed by Jinja2.
@@ -43,7 +43,7 @@ def getModelResults(pipeline, aligner, caller):
     @return - a dictionary values for use by Jinja2
     '''
     #get all the RTG-specific results for this aligner/caller combo
-    rtgResults = getRtgResults(pipeline, aligner, caller)
+    rtgResults = getRtgResults(datasets, pipeline, aligner, caller)
 
     #get all the training results for this aligner/caller combo
     trainingResults = getTrainingResults(pipeline, aligner, caller)
@@ -60,7 +60,7 @@ def getModelResults(pipeline, aligner, caller):
     }
     return retDict
 
-def getRtgResults(pipeline, aligner, caller):
+def getRtgResults(datasets, pipeline, aligner, caller):
     '''
     This will load results specific to the RTG evaluation, things like number of TP, TN, etc.
     @param pipeline - the pipeline subdirectory (usually "pipeline")
@@ -76,6 +76,8 @@ def getRtgResults(pipeline, aligner, caller):
     totalDict = {}
     for fn in rtgMetrics:
         slid = fn.split('/')[-2]
+        if slid not in datasets:
+            continue
         summaryDict = loadRtgSummary(fn)
 
         #make sure we got the big summary
@@ -413,7 +415,7 @@ if __name__ == "__main__":
             continue
 
         #get the results
-        comboData = getModelResults(args.pipeline, aligner, caller)
+        comboData = getModelResults(METADATA_DICT, args.pipeline, aligner, caller)
         
         #rename
         comboData['ALIGNER_LABEL'] = ALIGNER_RENAMING.get(aligner, aligner)
