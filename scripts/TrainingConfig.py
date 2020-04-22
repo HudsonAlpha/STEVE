@@ -15,7 +15,7 @@ GRID_MODE = 1  #only uses defined grid parameters; this is semi-expensive, but g
 BAYES_MODE = 2 #will search a range of parameters using BayesSearchCV to find params; this is expensive, should really only be done in high-dev mode
 
 #the training methology to use
-TRAINING_MODE = BAYES_MODE
+TRAINING_MODE = GRID_MODE
 
 #this is the fraction of variants that are used for the final test; the remaining are used for training
 TEST_FRACTION = 0.5
@@ -36,7 +36,7 @@ FLIP_TP = True
 CLASSIFIERS = []
 
 #Generally slight underperformance, but trains quickly
-ENABLE_RANDOMFOREST = False
+ENABLE_RANDOMFOREST = True
 
 #performs alright, but always seems to be below GradientBoostingClassifier and slow
 ENABLE_ADABOOST = False
@@ -131,11 +131,11 @@ if ENABLE_GRADIENTBOOST:
             'random_state' : [0],
             'n_estimators' : [1000], #prior tests: 100, 200; OBSOLETE: since adding n_iter_no_change, just set to a big number
             'max_depth' : [6], #prior tests: 3, 4
-            'learning_rate' : [0.01, 0.1, 0.5], #prior tests: 0.05, 0.2; from bayes mode, all results were in the 0.01-0.2 range with the occasional "high" rate near 0.5
+            'learning_rate' : [0.05, 0.1, 0.5], #prior tests: 0.01, 0.2; from bayes mode, all results were in the 0.04-0.2 range with the occasional "high" rate near 0.5
             'loss' : ['exponential'], #prior tests: 'deviance'
             'max_features' : ['sqrt'],
-            'min_samples_split' : [2, 50], #torn between extremes of 2 and 50 generally
-            'subsample' : [0.9], #almost all results were at the 0.9 cap; set there to help reduce overfitting
+            'min_samples_split' : [2, 15, 50], #mostly extremes in Bayes most, but adding 15 for middle-ground that was sometimes chosen
+            'subsample' : [0.5], #when specifically checking subsample, the most consistent models (het snv/indels) both used 0.5; 0.9 was used on homs, but setting to 0.5 for reduced overfitting
             'validation_fraction' : [0.1], #every meaningful model went straight to lowest value
             'n_iter_no_change' : [20] #just need a single value, 20 seems decent overall
         },
@@ -147,7 +147,7 @@ if ENABLE_GRADIENTBOOST:
             'learning_rate' : Real(0.0001, 0.5, prior='log-uniform'), #still shows variability, usually in range 0.01-0.5
             'loss' : Categorical(['exponential']), #prior tests: 'deviance' #just never seemed to out-perform exponential *shrug*
             'max_features' : Categorical(['sqrt']),
-            'min_samples_split' : Real(0.0000001, 0.01, prior='log-uniform'), #Integer(2, 50), #both extremes usually chosen, #TODO: consider making fractional scale
+            'min_samples_split' : Integer(2, 50), #found we generally get both extremes 2 and 50, with some middle-ish ~15
             'subsample' : Categorical([0.5, 0.9, 1.0]),#Real(0.5, 0.9, prior='uniform'), #subsampling almost almost went straight to the max value
             'validation_fraction' : Categorical([0.1]), #Used to be "Real(0.1, 0.5, prior='uniform')", but 0.1 always chosen, so put bayes into other places
             'n_iter_no_change' : Categorical([20]) #used to be Integer(10, 20), but i think we can just safely set it to a single medium-sized value so fitting focuses on useful things
