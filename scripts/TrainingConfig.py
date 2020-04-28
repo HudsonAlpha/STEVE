@@ -35,10 +35,10 @@ FLIP_TP = True
 # changing to false removes the classifier from training which also reduces runtime
 CLASSIFIERS = []
 
-#Generally slight underperformance, but trains quickly
+#Generally slight underperformance, but is a decent backup
 ENABLE_RANDOMFOREST = True
 
-#performs alright, but always seems to be below GradientBoostingClassifier and slow
+#performs alright, but always seems to be below GradientBoostingClassifier and slower
 ENABLE_ADABOOST = False
 
 #historically, this one has been victorious
@@ -51,6 +51,14 @@ ENABLE_XGBOOST = False
 
 #slightly beats GradientBoosting in hom. SNVs, but very slow to train; not worth CPU time IMO
 ENABLE_EASYENSEMBLE = False
+
+#this is an experimental mode in sklearn, it may change rapidly from version to version
+try:
+    from sklearn.experimental import enable_hist_gradient_boosting
+    from sklearn.ensemble import HistGradientBoostingClassifier
+    ENABLE_HISTGRADIENTBOOST = True
+except:
+    ENABLE_HISTGRADIENTBOOST = False
 
 #here is where we put what each enable option indicates
 #now enumerate the models as a tuple (
@@ -72,7 +80,7 @@ if ENABLE_RANDOMFOREST:
         {
             'random_state' : [0],
             'class_weight' : ['balanced'],
-            'n_estimators' : [200, 500], #prior tests: 100, 300
+            'n_estimators' : [500], #prior tests: 100, 200, 300
             'max_depth' : [6], #prior tests: 3, 4, 5
             'min_samples_split' : [2, 50],
             'max_features' : ['sqrt'],
@@ -89,6 +97,7 @@ if ENABLE_RANDOMFOREST:
             #'max_samples' : Real(0.1, 1.0, prior='uniform') #TODO: need to update scikit-learn to use this
         })
     )
+
 if ENABLE_ADABOOST:
     CLASSIFIERS.append(
         '''
@@ -148,7 +157,7 @@ if ENABLE_GRADIENTBOOST:
             'loss' : Categorical(['exponential']), #prior tests: 'deviance' #just never seemed to out-perform exponential *shrug*
             'max_features' : Categorical(['sqrt']),
             'min_samples_split' : Integer(2, 50), #found we generally get both extremes 2 and 50, with some middle-ish ~15
-            'subsample' : Categorical([0.5, 0.9, 1.0]),#Real(0.5, 0.9, prior='uniform'), #subsampling almost almost went straight to the max value
+            'subsample' : Categorical([0.5, 0.9, 1.0]),#Real(0.5, 0.9, prior='uniform'), #subsampling almost almost went straight to the max value but also commonly leads to overfitting
             'validation_fraction' : Categorical([0.1]), #Used to be "Real(0.1, 0.5, prior='uniform')", but 0.1 always chosen, so put bayes into other places
             'n_iter_no_change' : Categorical([20]) #used to be Integer(10, 20), but i think we can just safely set it to a single medium-sized value so fitting focuses on useful things
         })
@@ -198,5 +207,35 @@ if ENABLE_EASYENSEMBLE:
         {
             'random_state' : Categorical([0]),
             'n_estimators' : Integer(10, 100) #prior tests: 10, 20, 30
+        })
+    )
+
+if ENABLE_HISTGRADIENTBOOST:
+    '''
+    In general, this seems to slightly under-perform compared to classic GradientBoosting above. However, the 
+    results are relative and the training time on this is truly impressive. Prelim tests with 33 cores only 
+    required ~1.5 hrs for ALL of the models for SS mode.  It's basically worth it to keep this no matter what 
+    simple because training is ridiculously fast.  It might also be a good new baseline model to use just for
+    speed purposes.
+    '''
+    CLASSIFIERS.append(
+        ('HistGradientBoosting', HistGradientBoostingClassifier(random_state=0),
+        {
+            'random_state' : [0],
+            'learning_rate' : [0.05, 0.1], #high learning rates don't seem to work out very well
+            'max_iter' : [1000],
+            'max_leaf_nodes' : [31], #don't want to make this too high or it overfits
+            'min_samples_leaf' : [200, 2000], #want this to be semi-high to avoid overfitting to a few variants
+            'validation_fraction' : [0.1],
+            'n_iter_no_change' : [20]
+        },
+        {
+            'random_state' : Categorical([0]),
+            'learning_rate' : Real(0.0001, 0.2, prior='log-uniform'),
+            'max_iter' : Categorical([1000]),
+            'max_leaf_nodes' : Integer(15, 255, prior='log-uniform'), #Categorical([7, 15, 31, 63, 127, None]),
+            'min_samples_leaf' : Integer(20, 20000, prior='log-uniform'),
+            'validation_fraction' : Categorical([0.1]),
+            'n_iter_no_change' : Categorical([20])
         })
     )
