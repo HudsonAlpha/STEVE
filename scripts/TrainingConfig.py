@@ -53,12 +53,14 @@ ENABLE_XGBOOST = False
 ENABLE_EASYENSEMBLE = False
 
 #this is an experimental mode in sklearn, it may change rapidly from version to version
-try:
-    from sklearn.experimental import enable_hist_gradient_boosting
-    from sklearn.ensemble import HistGradientBoostingClassifier
-    ENABLE_HISTGRADIENTBOOST = True
-except:
-    ENABLE_HISTGRADIENTBOOST = False
+ENABLE_HISTGRADIENTBOOST = True
+if ENABLE_HISTGRADIENTBOOST:
+    #make sure we can actually do what we're trying to do
+    try:
+        from sklearn.experimental import enable_hist_gradient_boosting
+        from sklearn.ensemble import HistGradientBoostingClassifier
+    except:
+        ENABLE_HISTGRADIENTBOOST = False
 
 #here is where we put what each enable option indicates
 #now enumerate the models as a tuple (
@@ -71,7 +73,7 @@ except:
 if ENABLE_RANDOMFOREST:
     '''
     Random forest is generally relatively fast to train and a decent baseline.  It's almost always beaten by one
-    of the other models in my experience.  However, it occasionally rises to task with a large enough model.  In general,
+    of the other models.  However, it occasionally rises to task with a large enough model (i.e. n=500).  In general,
     if you do the grid search, most of your models will be 500 estimators with bootstrap and min_samples_split about
     half-and-half depending on the data type.
     '''
@@ -216,7 +218,8 @@ if ENABLE_HISTGRADIENTBOOST:
     results are relative and the training time on this is truly impressive. Prelim tests with 33 cores only 
     required ~1.5 hrs for ALL of the models for SS mode.  It's basically worth it to keep this no matter what 
     simple because training is ridiculously fast.  It might also be a good new baseline model to use just for
-    speed purposes.
+    speed purposes.  There are issues getting it to pass models with our criteria though, seems to have 
+    consistency issues (could be over/under-fitting, hard to tell at this juncture).
     '''
     CLASSIFIERS.append(
         ('HistGradientBoosting', HistGradientBoostingClassifier(random_state=0),
