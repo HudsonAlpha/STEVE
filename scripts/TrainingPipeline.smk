@@ -6,6 +6,7 @@ from PipelineConfig import *
 
 #derived from repo 
 PIPELINE_DIRECTORY = '%s/pipeline' % REPO_DIRECTORY
+#CONDA_ENV = '%s/scripts/conda_config.yaml' % REPO_DIRECTORY
 EXTRACT_SCRIPT = '%s/scripts/ExtractFeatures.py' % REPO_DIRECTORY
 TRAINING_SCRIPT = '%s/scripts/TrainModels.py' % REPO_DIRECTORY
 DATA_REPORT_SCRIPT = '%s/scripts/PrintDataReport.py' % REPO_DIRECTORY
@@ -107,6 +108,8 @@ rule ExtractFeatures:
     params:
         script=EXTRACT_SCRIPT,
         prefix="{pipeline_dir}/features"
+    #conda:
+    #    CONDA_ENV
     log: "{pipeline_dir}/logs/features/{aligner}/{caller}/{slid}.log"
     threads: 1 #this currently isn't multi-threaded in any way
     shell:
@@ -160,10 +163,12 @@ rule TrainModels:
         feature_dir="{pipeline_dir}/features/{aligner}/{caller}",
         slids=RAW_SLIDS,
         output_prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+    #conda:
+    #    CONDA_ENV
     log: "{pipeline_dir}/logs/trained_models/{aligner}/{caller}_training.log"
     threads: THREADS_PER_PROC #only applies to CV, but still a big speedup
     resources:
-        mem_mb=48000
+        mem_mb=128000
     shell:
         '''
         python3 -u {params.script} \
@@ -186,6 +191,8 @@ rule SummarizeFeatures:
     params:
         script=DATA_REPORT_SCRIPT,
         prefix="{pipeline_dir}/features/{aligner}/{caller}"
+    #conda:
+    #    CONDA_ENV
     log: "{pipeline_dir}/logs/feature_stats/{aligner}/{caller}.log"
     threads: 1
     shell:
@@ -206,6 +213,8 @@ rule SummarizeModels:
     params:
         script=MODEL_REPORT_SCRIPT,
         prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+    #conda:
+    #    CONDA_ENV
     log: "{pipeline_dir}/logs/model_summaries/{aligner}/{caller}.log"
     threads: 1
     shell:
@@ -226,6 +235,8 @@ rule StrictSummarizeModels:
     params:
         script=MODEL_REPORT_SCRIPT,
         prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+    #conda:
+    #    CONDA_ENV
     log: "{pipeline_dir}/logs/model_summaries/{aligner}/{caller}.log"
     threads: 1
     shell:
@@ -247,6 +258,8 @@ rule ModelEli5:
     params:
         script=MODEL_ELI5_SCRIPT,
         prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+    #conda:
+    #    CONDA_ENV
     log: "{pipeline_dir}/logs/eli5_summaries/{aligner}/{caller}.log"
     threads: 1
     shell:

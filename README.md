@@ -9,7 +9,7 @@ The core idea is to use the Genome in a Bottle Truth Set(s) to gather a collecti
 3. Variant evaluation - runs the models and predicts whether a variant is a false positive or true positive
 
 ## Snakemake Pipeline
-The easiest way to invoke this pipeline is to use the snakemake wrapper script, `RunTrainingPipeline.py`. This will first require some pipeline configuration, sample configuration, and then a final run step.
+The easiest way to invoke this pipeline is to use the provided conda environment and the snakemake wrapper script, `RunTrainingPipeline.py`. This will first require some pipeline configuration, sample configuration, and then a final run step.
 
 ### Pipeline Configuration
 Inside `PipelineConfig.py` is a set of information describing where files can be found within your environment. Generally, these values need to be set only once during the initial setup. The following are key variables that should be modified:
@@ -35,14 +35,25 @@ The following fields are optional metadata keys currrently used in the automatic
 
 ### Cluster Configuration
 We have currently configured the pipeline to run using an LSF cluster.  If a different cluster type is to be used (or run locally), then several modification may be necessary to the `RunTrainingPipeline.py` script itself. Note that these changes should only have to be made when switching to a different execution environment.  We attempt to describe the possible changes below:
-1. `SNAKEMAKE_PROFILE` - we assume that the user has a [Snakemake profile](https://github.com/Snakemake-Profiles/doc) which has configured how/where to run snakemake jobs.  Once created, the value of this variable is the string (e.g. `lsf`) describing the profile.
+1. `SNAKEMAKE_PROFILE` - we assume that the user has a [Snakemake profile](https://github.com/Snakemake-Profiles/doc) which has configured how/where to run snakemake jobs.  Once created, the value of this variable is the string (e.g. `"lsf"`) describing the profile.
 2. If running locally, configuration changes to the snakemake command itself may be necessary. These are located in variable `snakemakeFrags`, contact the repo owner or submit a ticket for assistance.
+
+### Training Configuration (Optional)
+There are several options available that adjust way training of models is performed (e.g. models used, hyperparameters, training method, etc.).  These options are available in `TrainingConfig.py`.  Details on each will be in a future release. 
+
+### Setting up conda environment
+Assuming conda or miniconda is installed, use the following two commands to create and then activate a conda environment for the pipeline:
+
+```
+conda env create -f scripts/conda_config.yaml
+conda activate steve
+```
 
 ### Running the Pipeline
 Assuming the above configuration steps were successful, all that remains is to run the pipeline itself.  Here is an example execution of the pipeline used in the paper:
 
 ```
-python3 scripts/RunTrainingPipeline.py -d -e -s -t -x ./GIAB_v1.json
+python3 scripts/RunTrainingPipeline.py -dest -x ./GIAB_v1.json
 ```
 
 For details on each option, run `python3 scripts/RunTrainingPipeline.py -h`.  The following sections describe what the pipeline is actually doing.

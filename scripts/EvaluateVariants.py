@@ -245,7 +245,7 @@ def runSubType(variantType, args, stats, models, statKey):
             rawGT.append(featureVals[gtIndex])
     
     #if there are no variants, the following will throw errors
-    if len(allVariants) > 0:
+    if len(varFeatures) > 0:
         #convert to array 
         varIndex = np.array(varIndex)
         allFeatures = np.array(varFeatures)
