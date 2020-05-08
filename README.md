@@ -100,3 +100,8 @@ python3 EvaluateVariants.py \
 
 ## License
 For non-commerical use, STEVE is released under the Apache-2.0 License. For commercial use, please contact [jholt@hudsonalpha.org](jholt@hudsonalpha.org).
+
+## References
+Pre-print on bioRxiv:
+
+Holt, J. M., Wilk, M., Sundlof, B., Nakouzi, G., Bick, D., & Lyon, E. (2020). Reducing Sanger Confirmation Testing through False Positive Prediction Algorithms. _bioRxiv_.
