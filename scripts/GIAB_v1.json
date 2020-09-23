@@ -2,36 +2,43 @@
     "SL362490" : {
         "sample" : "NA12878",
         "prep" : "Clinical PCR",
-        "analysis" : ["all"]
+        "analysis" : ["all"],
+        "coverage" : 34.57
     },
     "SL362491" : {
         "sample" : "NA12878",
         "prep" : "Clinical PCR",
-        "analysis" : ["all"]
+        "analysis" : ["all"],
+        "coverage" : 34.44
     },
     "SL362492" : {
         "sample" : "NA12878",
         "prep" : "Clinical PCR",
-        "analysis" : ["all"]
+        "analysis" : ["all"],
+        "coverage" : 37.83
     },
     "SL409548" : {
         "sample" : "HG002",
         "prep" : "Clinical PCR",
-        "analysis" : ["all"]
+        "analysis" : ["all"],
+        "coverage" : 33.66
     },
     "SL409549" : {
         "sample" : "HG003",
         "prep" : "Clinical PCR",
-        "analysis" : ["all"]
+        "analysis" : ["all"],
+        "coverage" : 36.57
     },
     "SL409550" : {
         "sample" : "HG004",
         "prep" : "Clinical PCR",
-        "analysis" : ["all"]
+        "analysis" : ["all"],
+        "coverage" : 30.12
     },
     "SL409551" : {
         "sample" : "HG005",
         "prep" : "Clinical PCR",
-        "analysis" : ["all"]
+        "analysis" : ["all"],
+        "coverage" : 32.01
     }
 }

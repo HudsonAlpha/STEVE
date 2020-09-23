@@ -48,7 +48,9 @@ def printAllStats(modelDir, rocDir, minRecall, targetRecall):
         if rocDir != None:
             createRocImage(reformKey, rocs[k], rocDir)
     
-    printClinicalModels(stats, minRecall, targetRecall, models)
+    imageDict = printClinicalModels(stats, minRecall, targetRecall, models)
+    if rocDir != None:
+        createTrainingImage(imageDict, rocDir)
 
 def printModelStats(modelType, stats):
     '''
@@ -119,6 +121,27 @@ def createRocImage(modelType, rocStats, rocDir):
     plt.close()
     return outFN
 
+def createTrainingImage(imageDict, rocDir):
+    outFN = '%s/clinical_compare.png' % (rocDir, )
+    plt.figure()
+    plt.title('Selected Clinical Models')
+    plt.xlabel('FPR')
+    plt.ylabel('TPR / sensitivity')
+    plt.xlim([0.0000, 1.0000])
+    plt.ylim([0.9900, 1.0000])
+    plt.axhline(0.9950, color='black', linestyle='--')
+
+    markers = ['o', 's', 'D', 'v', 'P', '^']
+    for i, k in enumerate(imageDict.keys()):
+        tprArray, fprArray, tpr, fpr = imageDict[k]
+        plt.scatter(fprArray, tprArray, marker=markers[i], facecolors='none', edgecolors='black')
+        plt.scatter([fpr], [tpr], marker=markers[i], facecolors='black', edgecolors='black', label=k)
+
+    plt.legend()
+    plt.grid()
+    plt.savefig(outFN)
+    plt.close()
+
 def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels):
     header = [
         'variant_type', 'best_model', 'model_eval',
@@ -126,6 +149,7 @@ def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels):
     ]
     print('[clinical_model min=%0.4f tar=%0.4f]' % (acceptedRecall, targetRecall))
     print(*header, sep='\t')
+    imageDict = {}
     for k in sorted(allStats.keys()):
         stats = allStats[k]
         reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
@@ -154,9 +178,20 @@ def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels):
                 '%0.4f+-%0.4f' % (bestTPRAvg, bestTPRStd), 
                 '%0.4f' % bestTPR,
                 '%0.4f+-%0.4f' % (bestFPRAvg, bestFPRStd), 
-                '%0.4f' % bestFPR
+                '%0.4f' % bestFPR,
+                #str(stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_TPR']),
+                #str(stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_FPR'])
             ]
             print(*rowVals, sep='\t')
+
+            imageDict[reformKey] = (
+                stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_TPR'],
+                stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_FPR'],
+                bestTPR,
+                bestFPR
+            )
+    
+    return imageDict
 
 if __name__ == "__main__":
     #first set up the arg parser

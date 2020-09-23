@@ -4,7 +4,7 @@
     "VARIANT_ORDER" : ["SNV", "INDEL"],
     "CALL_ORDER" : ["HET", "HOM", "HE2"],
     "METADATA_ORDER" : [
-        "sample", "prep"
+        "sample", "prep", "coverage"
     ],
     "METADATA" : {
         "default" : {
@@ -15,6 +15,9 @@
         },
         "prep" : {
             "label" : "Preparation"
+        },
+        "coverage" : {
+            "label" : "Mean Coverage"
         }
     },
     "RTG_RESULTS_ORDER" : [
@@ -53,19 +56,19 @@
             "label" : "Best Model"
         },
         "model_eval" : {
-            "label" : "Evaluation Sensitivity"
+            "label" : "Evaluation Capture Rate"
         },
         "CV_recall" : {
-            "label" : "CV Sensitivity"
+            "label" : "CV Capture Rate"
         },
         "final_recall" : {
-            "label" : "Final Sensitivity"
+            "label" : "Final Capture Rate"
         },
         "CV_FPR" : {
-            "label" : "CV FPR"
+            "label" : "CV TP flag rate"
         },
         "final_FPR" : {
-            "label" : "Final FPR"
+            "label" : "Final TP flag rate"
         }
     }
 }

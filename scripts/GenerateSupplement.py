@@ -191,6 +191,7 @@ def getTrainingResults(pipeline, aligner, caller, strict=False):
     fp = open(summaryFN, 'r')
 
     #hunt for the section we care about then TSV parse it
+    var_counts = {}
     for l in fp:
         if l.startswith('[clinical_model'):
             pieces = l.rstrip()[1:-1].split(' ')
@@ -200,8 +201,38 @@ def getTrainingResults(pipeline, aligner, caller, strict=False):
             clinicalMinimum = float(pieces[1][4:])
             clinicalTarget = float(pieces[2][4:])
             break
+        elif l.startswith('['):
+            vt, tpcount, fpcount = l.rstrip()[1:-1].split(' ')
+            assert(tpcount[0:3] == 'TP=')
+            assert(fpcount[0:3] == 'FP=')
+            tpcount = int(tpcount[3:])
+            fpcount = int(fpcount[3:])
+            var_counts[vt] = {
+                'TP' : tpcount,
+                'FP' : fpcount
+            }
+
     dictReader = csv.DictReader(fp, delimiter='\t')
     for d in dictReader:
+        d = dict(d)
+
+        '''
+        #if we decide CI is useful, this would add it
+        if d['best_model'] != 'None':
+            #calculate confidence intervals; TP counts goes with FPR/TP flag rate
+            z = 1.96 #95% CI
+            tpcount = var_counts[d['variant_type']]['TP']
+            fpr = float(d['final_FPR'])
+            fprCI = z * np.sqrt(fpr * (1-fpr) / tpcount)
+            d['final_FPR'] = '%0.4f+-%0.4f' % (fpr, fprCI)
+
+            #FP counts goes with recall/sensitivity/capture rate
+            fpcount = var_counts[d['variant_type']]['FP']
+            recall = float(d['final_recall'])
+            recallCI = z * np.sqrt(recall * (1-recall) / fpcount)
+            d['final_recall'] = '%0.4f+-%0.4f' % (recall, recallCI)
+        '''
+        
         clinicalResults[d['variant_type']] = d
     fp.close()
     
@@ -335,6 +366,7 @@ def generateReport(dataDict, prefix):
             #for this one, we only pass the partial dictionary
             partialDict = copy.deepcopy(dataDict['PARSED_DATA'][aligner][caller])
             partialDict['FORMAT'] = dataDict['FORMAT']
+            partialDict['METADATA'] = dataDict['METADATA']
             partialDict['sorted'] = sorted
             rendered = template.render(partialDict)
             print(rendered)

@@ -87,13 +87,16 @@ Table \ref{tab:hyperparameters} reproduces the list of hyperparameters that were
 \end{longtable}
 
 \subsection{Clinical Model Selection Formula}
-After full training, the models are evaluated on the unseen test dataset. Any candidate models are required to pass a cross-validation sensitity requirement and final sensitivity requirement (see main document for details). We then use the following methodology to select the ``best'' candidate model that will ultimately be used clinically.  Note that this process is used for each variant/genotype combination, culminating in up to six final models (one per combo).
+After full training, the models are evaluated on the unseen test dataset. 
+Any candidate models are required to pass a cross-validation capture rate requirement and final capture rate requirement (see main document for details). 
+We then use the following methodology to select the ``best'' candidate model that will ultimately be used clinically.  
+Note that this process is used for each variant/genotype combination, culminating in up to six final models (one per combo).
 
 \begin{enumerate}
-    \item Let $S_m=0.99$ be the minimum acceptable sensitivity and $S_t=0.995$ be the target sensitivity for the models.
-    \item For each candidate model, let $S$ be the final sensitivity and $F$ be the final false positive rate (FPR) for the model.
-    \item Calculate the scaled sensitivity score, that is at most 1.0 (representing a model reaching the target sensitivity): $S_s = min(1.0, {S - S_m \over S_t - S_m})$
-    \item Calculate the specificity (true negative rate), $T = 1.0-F$, such that higher values indicate fewer true variant calls being incorrectly sent for confirmation.
+    \item Let $S_m=0.99$ be the minimum acceptable capture rate and $S_t=0.995$ be the target capture rate for the models.
+    \item For each candidate model, let $S$ be the final capture rate and $F$ be the final TP flag rate for the model.
+    \item Calculate the scaled capture rate score, that is at most 1.0 (representing a model reaching the target capture rate): $S_s = min(1.0, {S - S_m \over S_t - S_m})$
+    \item Calculate the machine learning specificity (true negative rate), $T = 1.0-F$, such that higher values indicate fewer true variant calls being incorrectly sent for confirmation.
     \item Calculate the modified F1 score: $F = harmonic\_mean(S_s, T)$
     \item Of the remaining models, select the model with the highest F1 score, $F$, for use clinically.
 \end{enumerate}

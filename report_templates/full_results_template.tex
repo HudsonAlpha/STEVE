@@ -2,12 +2,17 @@
 The following sections denote results that are specific the the pipeline consisting of aligner ``{{ ALIGNER_LABEL }}" and variant caller ``{{ CALLER_LABEL }}".
 
 \subsection{RTG VCFeval Results}
-The following sections contain results as reported by \texttt{rtg vcfeval}. For information on how \texttt{rtg vcfeval} was invoked, refer to Section \ref{sec:rtg_vcfeval}.
+The following sections contain results as reported by \texttt{rtg vcfeval}. 
+For information on how \texttt{rtg vcfeval} was invoked, refer to Section \ref{sec:rtg_vcfeval}.
 
 \subsubsection{Pipeline Performance}
-Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_rtg_summary} contains the results from the RTG VCFeval \texttt{summary.txt} file that primarily contains summary information regarding the evaluated VCF file. We copied the results from this summary (unfiltered ``None'' row) and calculated summary mean and standard deviation as well.
+Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_rtg_summary} contains the results from the RTG VCFeval \texttt{summary.txt} file that primarily contains summary information regarding the evaluated VCF file. 
+We copied the results from this summary (unfiltered ``None'' row) and calculated summary mean and standard deviation as well.
 
-Sensitivity is the fraction of annotated true positives that were correctly identified by the pipeline, precision is the fraction of called variants that were part of the truth set, and F-measure is the harmonic mean of sensitivy and precision. A perfect caller would have 1.0000 for all scores.
+Sensitivity is the fraction of annotated true positives that were correctly identified by the pipeline, 
+precision is the fraction of called variants that were part of the truth set, 
+and F-measure is the harmonic mean of sensitivity and precision. 
+A perfect caller would have 1.0000 for all scores.
 
 \begin{table}
     \centering
@@ -20,7 +25,7 @@ Sensitivity is the fraction of annotated true positives that were correctly iden
         \\ \hline
         {% set final_sample = sorted(RTG_RESULTS.SAMPLE_SUMMARY.keys())[-1] %}
         {% for sample in sorted(RTG_RESULTS.SAMPLE_SUMMARY.keys()) %}
-            {{ sample }}
+            {{ sample }} ({{ METADATA[sample]['sample'] }})
             {% for fk in FORMAT.RTG_RESULTS_ORDER %}
                 &{{ FORMAT.RTG_RESULTS.get(fk, {}).get('format', FORMAT.RTG_RESULTS['default']['format']).format(RTG_RESULTS.SAMPLE_SUMMARY[sample][fk]) }}
             {% endfor %}
@@ -62,7 +67,7 @@ Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_variants} contains a summary of the nu
                 {% if sample == 'total' %}
                     {{ FORMAT.TOTAL_COLOR }}Total
                 {% else %}
-                    {{ sample }}
+                    {{ sample }} ({{ METADATA[sample]['sample'] }})
                 {% endif %}
                 &{{ at }}
                 {% for vt in FORMAT.VARIANT_ORDER %}
@@ -87,7 +92,7 @@ Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_variants} contains a summary of the nu
 The following sections contain results specific to the final trained models.
 
 \subsubsection{Selected Models}
-Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_best_models} contains the selected models for aligner ``{{ ALIGNER_LABEL }}'' and caller ``{{ CALLER_LABEL }}'' given the minimum sensitivity, $S_m = {{ TRAINING_RESULTS.CLINICAL_MINIMUM }}$, and the target sensitivity, $S_t = {{ TRAINING_RESULTS.CLINICAL_TARGET }}$.
+Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_best_models} contains the selected models for aligner ``{{ ALIGNER_LABEL }}'' and caller ``{{ CALLER_LABEL }}'' given the minimum capture rate, $S_m = {{ TRAINING_RESULTS.CLINICAL_MINIMUM }}$, and the target capture rate, $S_t = {{ TRAINING_RESULTS.CLINICAL_TARGET }}$.
 
 \begin{table}
     \centering
@@ -113,12 +118,20 @@ Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_best_models} contains the selected mod
             {% endfor %}
         {% endfor %}
     \end{tabular}
-    \caption{Selected models for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', $S_m = {{ TRAINING_RESULTS.CLINICAL_MINIMUM }}$, $S_t = {{ TRAINING_RESULTS.CLINICAL_TARGET }}$. If no model passed the criteria, then the ``Best Model'' field will be ``None''. Evaluation sensitivity is the training sensitivity that was used to gather results for the remaining fields in testing. Results prefaced with ``CV'' represent the test results during cross-validation. Similarly, results prefaced with ``Final'' represent the results on the held-out testing set during final evaluation. Note that we required the models to have sensitivity requirements based on both the CV and Final results.  In contrast, FPR is not bound by any requirements, but is instead representative of the expected fraction of orthogonal confirmations required if the model is used.}
+    \caption{Selected models for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', $S_m = {{ TRAINING_RESULTS.CLINICAL_MINIMUM }}$, $S_t = {{ TRAINING_RESULTS.CLINICAL_TARGET }}$. 
+    If no model passed the criteria, then the ``Best Model'' field will be ``None''. 
+    Evaluation capture rate is the training capture that was used to gather results for the remaining fields in testing. 
+    Results prefaced with ``CV'' represent the test results during cross-validation. 
+    Similarly, results prefaced with ``Final'' represent the results on the held-out testing set during final evaluation. 
+    Note that we required the models to have capture requirements based on both the CV and Final results.  
+    In contrast, TP flag rate is not bound by any requirements, but is instead representative of the expected fraction of orthogonal confirmations required if the model is used.}
     \label{tab:{{ ALIGNER }}_{{ CALLER }}_best_models}
 \end{table}
 
 \subsubsection{Strict Models}
-Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_strict_models} contains the strict models for aligner ``{{ ALIGNER_LABEL }}'' and caller ``{{ CALLER_LABEL }}'' given the minimum sensitivity, $S_m = {{ STRICT_RESULTS.CLINICAL_MINIMUM }}$, and the target sensitivity, $S_t = {{ STRICT_RESULTS.CLINICAL_TARGET }}$.  These models are labeled strict due to very high requirements, and the majority of models at different evaluation sensitivities fail to pass these criteria.  As a result, many variant/genotype combinations have no passing models or have models that are not practically useful (e.g. an FPR of 99\%).
+Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_strict_models} contains the strict models for aligner ``{{ ALIGNER_LABEL }}'' and caller ``{{ CALLER_LABEL }}'' given the minimum capture rate, $S_m = {{ STRICT_RESULTS.CLINICAL_MINIMUM }}$, and the target capture rate, $S_t = {{ STRICT_RESULTS.CLINICAL_TARGET }}$.  
+These models are labeled strict due to very high requirements, and the majority of models at different evaluation capture rates fail to pass these criteria.  
+As a result, many variant/genotype combinations have no passing models or have models that are not practically useful (e.g. a TP flag rate of 99\%).
 
 \begin{table}
     \centering
@@ -144,7 +157,7 @@ Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_strict_models} contains the strict mod
             {% endfor %}
         {% endfor %}
     \end{tabular}
-    \caption{Strict models for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', $S_m = {{ STRICT_RESULTS.CLINICAL_MINIMUM }}$, $S_t = {{ STRICT_RESULTS.CLINICAL_TARGET }}$. If no model passed the criteria, then the ``Best Model'' field will be ``None''. Evaluation sensitivity is the training sensitivity that was used to gather results for the remaining fields in testing. Results prefaced with ``CV'' represent the test results during cross-validation. Similarly, results prefaced with ``Final'' represent the results on the held-out testing set during final evaluation. Note that we required the models to have sensitivity requirements based on both the CV and Final results.  In contrast, FPR is not bound by any requirements, but is instead representative of the expected fraction of orthogonal confirmations required if the model is used.}
+    \caption{Strict models for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', $S_m = {{ STRICT_RESULTS.CLINICAL_MINIMUM }}$, $S_t = {{ STRICT_RESULTS.CLINICAL_TARGET }}$. If no model passed the criteria, then the ``Best Model'' field will be ``None''. Evaluation capture rate is the training capture rate that was used to gather results for the remaining fields in testing. Results prefaced with ``CV'' represent the test results during cross-validation. Similarly, results prefaced with ``Final'' represent the results on the held-out testing set during final evaluation. Note that we required the models to have capture rate requirements based on both the CV and Final results.  In contrast, TP flag rate is not bound by any requirements, but is instead representative of the expected fraction of orthogonal confirmations required if the model is used.}
     \label{tab:{{ ALIGNER }}_{{ CALLER }}_strict_models}
 \end{table}
 
@@ -153,7 +166,7 @@ Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_eli5} contains results regarding featu
 
 \begin{enumerate}
     \item ELI5 interpretation was not run correctly - This could be because the \texttt{ExtractELI5Results.py} script has not been executed or the outputs are not in the expected location.
-    \item The model failed to pass our base clinical criteria - We restricted the outputs to only include models that met the minimum sensitivity requirement as defined in the ``Selected Models'' section above.
+    \item The model failed to pass our base clinical criteria - We restricted the outputs to only include models that met the minimum capture rate requirement as defined in the ``Selected Models'' section above.
     \item The model is not interpretable by \texttt{eli5} - Not all models provide feature importance measures through eli5 so these results are excluded
 \end{enumerate}
 
@@ -196,7 +209,7 @@ Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_eli5} contains results regarding featu
             \begin{figure}[H]
                 \centering
                 \includegraphics[width=0.65\linewidth]{{"{"}}{{ TRAINING_RESULTS.IMAGE_FILENAMES[vt+'_'+gt] }}}
-                \caption{ROC curve for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', variant type ``{{ vt }}'', and genotype ``{{ gt }}''.  Note that these curves are zoomed in to focus on only the region greater than the minimum clinical sensitivity (0.99).}
+                \caption{ROC curve for aligner ``{{ ALIGNER_LABEL }}'', caller ``{{ CALLER_LABEL }}'', variant type ``{{ vt }}'', and genotype ``{{ gt }}''.  Note that these curves are zoomed in to focus on only the region greater than the minimum clinical capture rate (0.99).}
                 \label{fig:{{ ALIGNER }}_{{ CALLER }}_{{ vt }}_{{ gt }}}
             \end{figure}
         {% else %}

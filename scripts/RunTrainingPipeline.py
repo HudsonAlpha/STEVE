@@ -125,8 +125,7 @@ if __name__ == "__main__":
         '--profile', SNAKEMAKE_PROFILE,
         '--snakefile', SNAKEFILE_PATH,
         '--cluster-config', SNAKEMAKE_CLUSTER_CONFIG,
-        #'--cluster', '"bsub -o {cluster.log} -J {cluster.name} -n {threads} -M {cluster.memory} -R \\"span[hosts=1] rusage[mem={cluster.memory}]\\""',
-        #'-j', '5000',
+        #'--use-conda', #TODO: figure this out if we want to aid in inter-operability
         '--config', 'sampleData="%s"' % (args.slids, ),
         '-p', #always print commands
         '-k', #keep going in the event of partial failure

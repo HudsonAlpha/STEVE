@@ -1,6 +1,6 @@
 {
     "__default__": {
-        "queue" : "c7normal",
+        "queue" : "csl",
         "logdir" : "/gpfs/gpfs1/home/jholt/sanger_less_tests/pipeline/logs/cluster",
         "memory" : 8000,
         "mem_mb" : 8000
