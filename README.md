@@ -104,7 +104,7 @@ For non-commerical use, STEVE is released under the Apache-2.0 License. For comm
 ## References
 Published paper:
 
-Holt, James M., et al. "Reducing Sanger confirmation testing through false positive prediction algorithms." _Genetics in Medicine_ (2021): 1-8.
+[Holt, James M., et al. "Reducing Sanger confirmation testing through false positive prediction algorithms." _Genetics in Medicine_ (2021): 1-8.](https://www.nature.com/articles/s41436-021-01148-3)
 
 Original pre-print on bioRxiv:
 
