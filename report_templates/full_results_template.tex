@@ -1,12 +1,12 @@
 {{ '\\section{{Results for {aligner}/{caller}}}'.format(aligner=ALIGNER_LABEL, caller=CALLER_LABEL) }}
 The following sections denote results that are specific the the pipeline consisting of aligner ``{{ ALIGNER_LABEL }}" and variant caller ``{{ CALLER_LABEL }}".
 
-\subsection{RTG VCFeval Results}
+\subsection{RTG vcfeval Results}
 The following sections contain results as reported by \texttt{rtg vcfeval}. 
 For information on how \texttt{rtg vcfeval} was invoked, refer to Section \ref{sec:rtg_vcfeval}.
 
 \subsubsection{Pipeline Performance}
-Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_rtg_summary} contains the results from the RTG VCFeval \texttt{summary.txt} file that primarily contains summary information regarding the evaluated VCF file. 
+Table \ref{tab:{{ ALIGNER }}_{{ CALLER }}_rtg_summary} contains the results from the RTG vcfeval \texttt{summary.txt} file that primarily contains summary information regarding the evaluated VCF file. 
 We copied the results from this summary (unfiltered ``None'' row) and calculated summary mean and standard deviation as well.
 
 Sensitivity is the fraction of annotated true positives that were correctly identified by the pipeline, 
@@ -42,7 +42,7 @@ A perfect caller would have 1.0000 for all scores.
         {% endfor %}
         \\ \hline
     \end{tabular}
-    \caption{Summary metrics from RTG VCFeval for aligner ``{{ ALIGNER_LABEL }}'' and variant caller ``{{ CALLER_LABEL }}''.}
+    \caption{Summary metrics from RTG vcfeval for aligner ``{{ ALIGNER_LABEL }}'' and variant caller ``{{ CALLER_LABEL }}''.}
     \label{tab:{{ ALIGNER }}_{{ CALLER }}_rtg_summary}
 \end{table}
 

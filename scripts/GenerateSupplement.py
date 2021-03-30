@@ -342,6 +342,8 @@ def generateReport(dataDict, prefix):
     if not os.path.exists(texDir):
         os.makedirs(texDir)
     dataDict['PREFIX'] = prefix
+    dataDict['REGION_COUNT_IMAGE'] = f'{MAIN_TEX_DIR}/region_count.png'
+    dataDict['IGV_REGION_IMAGE'] = f'{MAIN_TEX_DIR}/igv_region.png'
     env = Environment(loader=FileSystemLoader(MAIN_TEX_DIR))
     
     #functions we need to pass through
@@ -355,6 +357,7 @@ def generateReport(dataDict, prefix):
         ('metadata_template.tex', 'metadata_template.tex'),
         ('pipeline_template.tex', 'pipeline_template.tex'),
         ('training_template.tex', 'training_template.tex'),
+        ('hardcoded_template.tex', 'hardcoded_template.tex'),
     ]
 
     #build all aligner/caller templates
@@ -390,7 +393,7 @@ def generateReport(dataDict, prefix):
         fp = open(renderFN, 'wt+')
         fp.write(rendered)
         fp.close()
-    
+
     #check if we need to generate the PDF also
     #pdfFN = 
     #pdflatex <tex-prefix>.tex <---- need to run three time to make links/refs & such

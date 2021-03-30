@@ -1,0 +1,297 @@
+\section{HG006 and HG007 Experiment}
+The following sections outline data from experiments using samples HG006 and HG007.
+The data presented here is hard-coded into the document and currently is not auto-generated from the training process.
+
+\subsection{Datasets}
+Table \ref{tab:sample_hardcoded_metadata} contains the metadata for two samples (HG006 and HG007).
+These samples were not used for training, but only used to test the fully trained clinical models.
+
+\begin{longtable}{|l|r|r|r|}
+    \hline
+    {{ FORMAT.HEADER_COLOR }}\textbf{Library}
+    {% for fk in FORMAT.METADATA_ORDER %}
+        &{{ '\\textbf{'+FORMAT.METADATA.get(fk, {}).get('label', fk)+'}' }}
+    {% endfor %}
+    \\ \hline
+    \endhead
+    SL455110&HG006&Clinical PCR&35.98 \\ \hline
+    SL455111&HG007&Clinical PCR&33.69 \\ \hline
+    \caption{This table contains metadata regarding the two follow-up samples that were not used the train the clinical models.}
+    \label{tab:sample_hardcoded_metadata}
+\end{longtable}
+
+\subsection{RTG vcfeval Performance}
+Due to updates to the Dragen software, we were not able to run the above samples on the exact same version of Dragen as the training samples.
+Instead, they were run using Amazon AWS Dragen software version 05.021.510.3.5.7 (version 3.5.7).
+
+To focus the analysis, we restricted the regions that were analyzed to the intersection between 
+the benchmark regions and our set of annotated exon regions.  
+This substantially reduced the total number of variants per sample, but also removed many of the unusual regions we identified during analysis (see next section for details).
+Table \ref{tab:dragen-05.021.510.3.5.7_dragen-05.021.510.3.5.7_rtg_summary} contains the results from the RTG vcfeval \texttt{summary.txt} file that contains summary information regarding the evaluated VCF file. 
+
+Sensitivity is the fraction of annotated true positives that were correctly identified by the pipeline, 
+precision is the fraction of called variants that were part of the truth set, 
+and F-measure is the harmonic mean of sensitivity and precision. 
+A perfect caller would equal 1.0000 for all scores.
+
+\begin{longtable}{|l|r|r|r|r|r|}
+    \hline
+    {{ FORMAT.HEADER_COLOR }}\textbf{Sample}
+    {% for fk in FORMAT.RTG_RESULTS_ORDER %}
+        &{{ '\\textbf{'+FORMAT.RTG_RESULTS.get(fk, {}).get('label', fk)+'}' }}
+    {% endfor %}
+    \\ \hline
+    \endhead
+    %overall results
+    SL455110 (HG006-full)&3378563&13144&0.9971&0.9961&0.9966 \\ \hline
+    SL455111 (HG007-full)&3397333&13823&0.9968&0.9959&0.9964 \\ \hline
+    SL455110 (HG006-exons)&103285&151&0.9990&0.9985&0.9988 \\ \hline
+    SL455111 (HG007-exons)&104054&188&0.9989&0.9982&0.9985 \\ \hline
+    \caption{Summary metrics from RTG vcfeval for aligner ``dragen-05.021.510.3.5.7'' and variant caller ``dragen-05.021.510.3.5.7''.}
+    \label{tab:dragen-05.021.510.3.5.7_dragen-05.021.510.3.5.7_rtg_summary}
+\end{longtable}
+
+\subsection{Observations from the HG006 and HG007 experiments}
+\subsubsection{Background}
+Our training pipeline used HG001-005 to perform a leave-one-sample-out cross-validation.  
+With this completed, two samples that were not involved in model training, HG006 and HG007 GIAB samples, were tested with the trained models.  
+These two samples were sequenced about 1 year after sequencing the samples used to train the model using our standard clinical workflow. 
+These data passed our quality control evaluation used for clinical sequencing data.
+
+These two samples were run through our sentieon-strelka2 pipeline in a manner identical to the training samples.
+Unfortunately, the exact Dragen version used for training was not available due to upgrades.
+Therefore, we loaded a Dragen instance running v3.5.7 on Amazon Web Services to stand up a Dragen instance running v3.5.7.
+It should be noted that the models were trained on v3.2.8.
+When the outputs of both pipelines were compared to the benchmark regions, their performance was comparable to the previous samples (HG001-HG005) in terms of recall and precision (see Table \ref{tab:sample_hardcoded_metadata}).
+
+We then used the variants from HG006 and HG007 to test the models that were trained on HG001-HG005.
+For both samples and both pipelines, the results were poorer than expected with most of the models achieving less than 99\% capture rate for the false positive calls.
+This was an unexpected result, as testing a similar approach by leaving HG005 out of the training data had yielded a satisfactory result.
+After a series of debugging steps that included adding HG006 to our training set, we were not able to improve the results on these datasets.
+In all of our experiments, any test where HG006 or HG007 was the unseen test data ended poorly (when we trained with HG006, this was noticeable in our cross-validation as well).
+
+We considered the possibility that HG001-HG005 GIAB benchmarks were fundamentally different from HG006 and HG007 GIAB benchmarks.
+The following subsections detail some of our observations.
+
+\subsubsection{Different Processing Date}
+The GIAB FTP README file notes that the samples HG006 and HG007 were processed separately and at a later date than the other samples (HG001-HG005) for release 3.3.2.
+
+\subsubsection{Benchmark Regions}
+The benchmark regions for GIAB are stored in BED files consisting of a chromosome, a start coordinate, and an end coordinate for each region.
+First, the total number of benchmark regions for HG006 and HG007 is much larger than any other GIAB sample.
+Each one was almost double the count of HG005.
+Note that this trend is the \textit{opposite} of the Ashkenazi Jewish trio (HG002-HG004), where both parents had fewer benchmark regions than the child.
+Second, there were far more ``empty'' regions in HG006 and HG007 (regions that were included in the benchmark with no variants in them).
+Over 60\% of the regions are empty in HG006/HG007 (parents of Chinese trio) contrasted with about 35\% in HG003/HG004 (parents of Ashkenazi trio).
+HG006 and HG007 both also have far more total empty regions than any other sample from GIAB, each having nearly twice the number of empty regions compared to the sample with the next highest number of empty regions (HG002).
+The total number of regions for each sample by empty and non-empty are shown in Figure \ref{fig:region_count}.
+
+\begin{figure}
+    \centering
+    {{ "\includegraphics{"+REGION_COUNT_IMAGE+"}" }} 
+    \caption{The total number of benchmark regions per GIAB sample.  These are split into empty (no variants) and non-empty (at least one variant) regions.}
+    \label{fig:region_count}
+\end{figure}
+
+\subsubsection{Clustered False Positives}
+When we analyzed the false positive variants that were not captured by the trained models, they were more often ``clustered'' sequentially in the HG006 and HG007 datasets.
+While the variants in our dataset are stripped of identifying information (such as chromosome or position), they are still added sequentially to the feature set in the same order as the VCF.
+This means that these ``clusters'' of uncaptured false positive were more likely to be located near each other in genomic coordinate space, and they are also more likely to be within the same benchmark region.
+This cluster analysis is not entirely reliable for two reasons: 
+1) the false positives, while ordered by position, are not guaranteed to be within the same benchmark region and 
+2) the false positives of different variant types have been split into different subsets and therefore they are no longer adjacent in our feature matrix).
+
+To further analyze this observation, we collected a list of clusters of false positive variants (at least 2 variants in a row) that were not captured by our models.
+This analysis was performed on the full list of false positives for HG006 and HG007 which includes both exonic and non-exonic benchmark regions.
+We then counted the total number of clusters, the average cluster length, and the maximum cluster length for each sample.
+In both of our pipelines, there were more clusters, a longer average cluster length, and a longer maximum cluster length for HG006 and HG007 compared to all the other samples.
+Our HG006 sample seemed to have more and longer clusters than the HG007 sample.
+Additionally, this effect is more obvious in the sentieon-strelka2 pipeline where there are more total false positive calls in the datasets.
+These measures are presented in Tables \ref{tab:dragen-05.021.510.3.5.7_dragen-05.021.510.3.5.7_runs_summary} and \ref{tab:clinicalSS_runs_summary}.
+
+\begin{longtable}{|l|r|r|r|}
+    \hline
+    {{ FORMAT.HEADER_COLOR }}
+    \textbf{Sample}&\textbf{Total Clusters}&\textbf{Average Cluster Length}&\textbf{Max Cluster Length}\\ \hline
+    \endhead
+    SL362490 (HG001)&0&--&--\\ \hline
+    SL362491 (HG001)&2&2.0&2\\ \hline
+    SL362492 (HG001)&2&2.0&2\\ \hline
+    SL409548 (HG002)&1&2.0&2\\ \hline
+    SL409549 (HG003)&0&--&--\\ \hline
+    SL409550 (HG004)&0&--&--\\ \hline
+    SL409551 (HG005)&0&--&--\\ \hline
+    SL455110 (HG006)&31&2.74&8\\ \hline
+    SL455111 (HG007)&4&2.25&3\\ \hline
+    \caption{Statistics on clusters of false positive variants that were not correctly captured by the machine learning models for aligner ``dragen-05.021.510.3.5.7'' and variant caller ``dragen-05.021.510.3.5.7''.}
+    \label{tab:dragen-05.021.510.3.5.7_dragen-05.021.510.3.5.7_runs_summary}
+\end{longtable}
+
+\begin{longtable}{|l|r|r|r|}
+    \hline
+    {{ FORMAT.HEADER_COLOR }}
+    \textbf{Sample}&\textbf{Total Clusters}&\textbf{Average Cluster Length}&\textbf{Max Cluster Length}\\ \hline
+    \endhead
+    SL362490 (HG001)&17&2.2&3\\ \hline
+    SL362491 (HG001)&15&2.3&5\\ \hline
+    SL362492 (HG001)&11&2.2&3\\ \hline
+    SL409548 (HG002)&12&2.0&2\\ \hline
+    SL409549 (HG003)&10&2.3&5\\ \hline
+    SL409550 (HG004)&12&2.1&3\\ \hline
+    SL409551 (HG005)&12&2.2&4\\ \hline
+    SL455110 (HG006)&83&2.5&12\\ \hline
+    SL455111 (HG007)&32&2.3&5\\ \hline
+    \caption{Statistics on clusters of false positive variants that were not correctly captured by the machine learning models for aligner ``sentieon-201808.07'' and variant caller ``strelka-2.9.10''.}
+    \label{tab:clinicalSS_runs_summary}
+\end{longtable}
+
+\subsubsection{Manual inspection of one uncaptured run region}
+Visual inspection of one uncaptured region using the Integrative Genomic Viewer (IGV) provides a window into the ``clustering'' of uncaptured false positives.
+%Deriving the original variant calls from our feature sets is a challenging process because immediately identifying features have been removed.
+Coordinates are not included in the features for our variants, but by examining multiple features for the variants in one of these clusters, we were able to identify the variants in the false positive VCF file.
+They were all co-located in a single benchmark region (hg38, chr3:95472320-95472473).
+There are no variants in this benchmark region in the benchmark VCFs for HG005-HG007.
+However, in our variant calls for HG006 and HG007, both of our pipelines (Dragen and Sentieon/Strelka2) called 5 heterozygous SNVs.
+Visual inspection (via IGV) reveals that these variants are all on the same haplotype in both samples.
+These variants were not detected in HG005 (the child of HG006 and HG007), which would be consistent with inheriting the copies without the SNVs.
+Each of these five variants has a dbSNP identifier, and two of them reside in a repeat region according to the RepeatMasker track on UCSC.
+The alignments for all three samples appear to be relatively ``clean'', as in there are no obvious alignment artifacts present that would likely confound a variant caller.
+An IGV image of this region is in Figure \ref{fig:igv_region}.
+
+\begin{figure}
+    \centering
+    {{ "\\includegraphics[width=.95\\textwidth]{"+IGV_REGION_IMAGE+"}" }} 
+    \caption{A manually inspected region where a run of variants were all labeled as missed false positives.  These 5 heterozygous SNV variants visually appear real in HG006 (middle) and HG007 (bottom) but are visually absent in HG005 (top).}
+    \label{fig:igv_region}
+\end{figure}
+
+While these variants were absent from the HG006 final VCF file, \textit{all} of them appeared in a supplementary VCF labeled as ``testing'' for HG006.\footnote{\url{https://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/release/ChineseTrio/HG006_NA24694_father/NISTv3.3.2/GRCh38/supplementaryFiles/HG006_GIAB_GRCh38_highconf_CG-IllFB-IllSNT-10X_testing_CHROM1-22_v.3.3.2_all.vcf.gz}}
+They were labeled with the flag ``discordantunfiltered'' which has the description ``Callsets with unfiltered calls have discordant genotypes or variant calls''.
+Additionally, it was noted that each was run on 3 platforms and was called with the heterozygous genotype in 5 pipelines used to generate the GIAB benchmark.
+Manual inspection of the region in the 6 files provided in the supplementary files input VCFs\footnote{\url{https://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/release/ChineseTrio/HG006_NA24694_father/NISTv3.3.2/GRCh38/supplementaryFiles/inputvcfsandbeds/}} confirms this, with only the file labeled \texttt{HG006\_1-22\_GRCh38\_novoalign\_Hiseq100X\_FB.vcf.gz} missing the variant calls.
+Finally, the phase of the variants was established. 
+4 of the 5 variants are present on the same haplotype with the last one unphased according to the VCF file.
+We were unable to locate a similar ``testing'' VCF for HG007 to check for a similar phenomenon.
+
+Our variant calls are consistent with the calls from the ``testing'' file (and 5 of the 6 input files), but none of those calls appear in the high-confidence call set.
+%While it makes sense that the calls may be filtered due to discordance (even if just 1 of the 6 input files), it is unclear why the region is present inthe benchmark BED file given that there are 5 discordant calls within the relatively small region.
+It appears that calls are removed (filtered out) when there is discordance among the 6 input files. 
+Nevertheless, it is unclear why the region we examined is present in the benchmark BED file given that there are 5 discordant calls within the relatively small region of the chromosome.
+While we only inspected one region, we suspect similar phenomena are occurring in many of the additional, ``empty'' benchmark regions in HG006 and HG007. 
+
+\subsubsection{A possible explanation of our findings}
+It appears that the process to generate the truth sets for HG006 and HG007 was different from the process(es) for HG001-HG005.
+We think the different processing date and the major difference in total number of benchmark regions are the clearest evidence supporting this possibility.
+After the targeted manual inspection, we further suspect that either: (1) some regions were erroneously added to the BED file, (2) that the variants were erroneously removed from the VCF file, or (3) a combination of the two.
+Given the excess number of benchmark regions, we believe that at least (1) is likely.
+
+While this processing difference has a relatively minor influence on recall/precision for comparing aligners and variant callers (see our RTG results), 
+we think this difference is a significant confounding factor for our problem of identifying false positives via machine learning.
+In particular, our observations suggest that many true variants are being incorrectly classified as false positives.
+This would manifest as reduced capture rates in our tests for HG006 and HG007 because the models would \textit{correctly} recognize them as true positives, but that classification wouldn't match the result from RTG vcfeval.
+Given the above observations, we caution other researchers about the use v3.3.2 of HG006 and HG007 for the purpose of capturing false positives until their benchmark regions can be reconciled to the process used for HG001-HG005.
+
+\subsubsection{Addressing the issues with HG006 and HG007}
+It is unclear how to remove or correct the aforementioned phenomenon globally in HG006 and HG007.
+%We first tried to remove all ``empty'' regions from the benchmark. 
+Removing all ``empty'' regions from the benchmark dataset did improve our results, but not enough to capture false positives at the same level as HG001-HG005.
+Assuming our data issue hypothesis is correct, this would suggest that the processing error is not confined to ``empty'' regions from the BED file.
+
+We were able to control for the issue by reducing the GIAB benchmark regions to those that overlap exons (i.e. clinically relevant regions).
+This reduced the number of missed (uncaptured) false positive calls to 8 across both HG006 and HG007.
+This was a relatively manageable set of variants, so each was traced back to the original variant call by reviewing the features by hand and then verifying the absence from the truth set.
+We then evaluated all eight of these variants using two orthogonal methods: Sanger sequencing and PacBio HiFi sequencing.
+Detailed analysis of the 8 variants are presented in the next section.
+
+\subsection{Additional False Positive Information}
+After reducing the GIAB benchmark regions to those overlapping exons, we were left with 8 uncaptured, false positive calls across both HG006 and HG007.
+For each of these variants, we ordered orthogonal confirmation via Sanger sequencing. 
+We also analyzed PacBio HiFi sequencing from HudsonAlpha that is publicly available\footnote{HG006: \url{https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/ChineseTrio/HG006_NA24694-huCA017E_father/PacBio_CCS_15kb_20kb_chemistry2/reads/}}
+\footnote{HG007: \url{https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/data/ChineseTrio/HG007_NA24695-hu38168_mother/PacBio_CCS_15kb_20kb_chemistry2/reads/}}
+using three different aligners (minimap2-2.17\footnote{minimap2: \url{https://github.com/lh3/minimap2}}, pbmm2-1.2.1\footnote{pbmm2: \url{https://github.com/PacificBiosciences/pbmm2}}, and sentieon-201808.07) followed by DeepVariant-1.1.0\footnote{DeepVariant:\url{https://github.com/google/deepvariant}}.
+Where possible, we also investigated the GIAB HG006 ``testing'' file and corresponding input supplementary files (both HG006 and HG007) available from GIAB.
+The results of the Sanger tests, PacBio tests, and notes from our investigations are summarized in Table \ref{tab:sanger_summary}.
+
+Of the 8 initial variants, we labeled 5 of them as ``Confirmed TP'', meaning that the confirmatory and supporting evidence points to them being incorrectly excluded from the truth set.
+The two variants from HG007 were labeled as ``Likely TP'' as they were found via Sanger or PacBio sequencing, but not both.
+The first one (chr16:68157911A$>$G) was captured via Sanger sequencing, but was not detected by the PacBio sequencing.
+The second one (chr11:56700783C$>$T) failed Sanger sequencing.
+For this variant, all of the PacBio HiFi pipelines reported a homozgyous variant at this locus.
+We labeled this as a ``Likely TP'' because all sources are in agreement that the variant is present, yet there is a disagreement regarding the zygosity of the genotype call.
+The last variant was labeled as ``Likely FP'' because it was not detected by Sanger (it was noted as being possibly detected at very low levels) and found in only 1 of the 3 PacBio HiFi pipelines.
+While we left it as a FP, we are not confident in that decision because of the ambiguity in both the Sanger trace and the PacBio genotype calls.
+The degree of variability in evidence for the ``Likely TP'' and ``Likely FP'' variants may be further evidence that these regions are not yet ``resolved'' from a truth set perspective, and may have been incorrectly included in the benchmark files. 
+
+\newgeometry{margin=1in} % modify this if you need even more space
+\begin{landscape}
+
+\begin{longtable}{|l|l|p{0.08\textwidth}|p{0.08\textwidth}||l|p{0.10\textwidth}|p{0.10\textwidth}|p{0.35\textwidth}|}
+    \hline
+    {{ FORMAT.HEADER_COLOR }}
+    \textbf{Sample}&\textbf{Variant}&\textbf{Dragen Call}&\textbf{GIAB Call}&\textbf{HG006 ``testing''}&\textbf{Sanger (GT)}&\textbf{PacBio HiFi (GT:DP)}&\textbf{Categorization and Other Notes}\\ \hline
+    \endhead
+    HG006&chr1:12760937C$>$T&0/1&0/0&0/1 - allfilteredbutagree&0/1&0/1:41&\textbf{Confirmed TP}; called 0/1 in 5/6 of the GIAB input supplement files \\ \hline
+    HG006&chr14:54613194A$>$G&0/1&0/0&0/1 - allfilteredbutagree&Primers failed&0/1:49&\textbf{Confirmed TP}; called 0/1 in 5/6 of the GIAB input supplement files \\ \hline
+    HG006&chr14:105926375G$>$A&0/1&0/0&0/0&0/0$^*$&0/1:10 (1/3 pipelines)&\textbf{Likely FP}; visually detected in other PacBio BAMs, but was not called; called 0/1 in 4/6 of the GIAB input supplement files; $^*$Sanger was noted as unclean, variant possibly detected at low levels \\ \hline
+    HG006&chr3:10927922C$>$A&0/1&0/0&0/1 - allfilteredbutagree&Primers failed&0/1:39&\textbf{Confirmed TP}; called 0/1 in 5/6 of the GIAB input supplement files \\ \hline
+    HG006&chr7:102283115G$>$A&0/1&0/0&0/1 - allfilteredbutagree&0/1&0/1:25&\textbf{Confirmed TP}; called 0/1 in 5/6 of the GIAB input supplement files \\ \hline
+    HG006&chr19:7116767TG$>$T&0/1&0/0&0/0&Primers failed&0/1:40&\textbf{Confirmed TP}; called 0/1 in 4/6 of the GIAB input supplement files \\ \hline	
+    HG007&chr16:68157911A$>$G&0/1&0/0&N/A&0/1&0/0&\textbf{Likely TP}; missing from all GIAB input supplement files\\ \hline
+    HG007&chr11:56700783C$>$T&1/1&0/1&N/A&Primers failed&1/1:23&\textbf{Likely TP}; called 0/1 in all GIAB input supplement files \\ \hline
+    %\captionsetup{width=.8\linewidth}
+    \caption{
+        Uncaptured FP Variant Analysis.  
+        This table contains summary results of our investigation of 8 variants which was labeled as false positives that were not captured using our trained models.
+        We report the sample (HG006 or HG007), variant, the Dragen call, and the GIAB benchmark call on the left.
+        On the right, we first have variants extracted from an HG006 ``testing'' file that can be found in the supplements along with any corresponding flags for that variant.  
+        The ``allfilteredbutagree'' flag has the description ``All callsets have this call filtered or outside the callable regions but they have the same genotype.''
+        Then, the genotype call (GT) results from Sanger sequencing for variants without primer failure are present.
+        We also have the genotype call (GT) and depth of coverage (DP) for the PacBio HiFi sequencing.
+        Finally, we categorized the variants and provided additional notes from our investigation in the final column.
+        The 7 variants labeled as ``Confirmed TP'' or ``Likely TP'' were removed from our subsequent analyses.
+    }
+    \label{tab:sanger_summary}
+\end{longtable}
+
+\end{landscape}
+\restoregeometry
+
+\subsection{Final Performance on HG006 and HG007}
+After removing incorrectly labeled false positive calls (see previous section), we were left with 1 uncaptured false positive call.
+Table \ref{tab:final_hg67_performance} contains a summary of these results from both HG006 and HG007 exonic, benchmark regions.
+Overall, even with the one questionable false positive, the capture rate is still 99.70\% with a TP Flag Rate of 12.99\%.
+The TP flag rates in these exonic regions tends to be lower than the rates from our training and testing process, especially for indels.
+This suggests that the variants being called in exonic regions are perhaps ``cleaner'' than those elsewhere in the genome.
+
+%Dear future Matt,
+%This was run on the features pulled into /gpfs/gpfs1/home/jholt/sanger_less_tests/temporary_extractions/RefSeq_exons
+% - Past Matt
+\begin{longtable}{|l|p{0.25\textwidth}|p{0.25\textwidth}|}
+    \hline
+    {{ FORMAT.HEADER_COLOR }}
+    \textbf{Variant Type}&\textbf{Capture Rate (\%)}&\textbf{TP Flag Rate(\%)} \\ \hline
+    SNV - Heterozygous&99.35 (154/155)&10.58 (11365/107387) \\ \hline
+    SNV - Homozygous&100.0 (31/31)&12.43 (10193/81380) \\ \hline
+    SNV - Complex Het.&-- (0/0)&100.00 (44/44) \\ \hline
+    Indel - Heterozygous&100.00 (116/116)&26.19 (2937/11216) \\ \hline
+    Indel - Homozygous&100.00 (23/23)&32.70 (2225/6805) \\ \hline
+    Indel - Complex Het.&100.00 (7/7)&31.56 (160/507) \\ \hline
+    \textbf{All Variants}&\textbf{99.70 (331/332)}&\textbf{12.99 (26924/207339)} \\ \hline
+    \caption{
+        HG006 and HG007 Experiment Results.
+        This table shows the combined performance of our trained models for exonic benchmark variants from HG006 and HG007.
+        Each variant type has its own model, and the performance in terms of false positive capture rate and TP flag rate is shown.
+        Additionally, a combined summary is at the bottom labeled as ``All Variants''.
+        Overall, only 1 false positive call was not captured while only 12.99\% of true positives were flagged for confirmation.
+    }
+    \label{tab:final_hg67_performance}
+\end{longtable}
+
+\section{Notes on application outside benchmark regions}
+From our prospective analysis, 88 of the 306 variants were not contained by any of the GIAB benchmark regions.  
+Of these, four were primary or actionable, and five were non-actionable secondary findings.  
+The remaining 79 were non-actionable, pharmacogenomic variants, most of which were from one of five genes: CYP2B6 (12), CYP2D6 (23), CYP4F2 (12), IFNL3 (16), and VKORC1 (12).  
+Our lab has extensive experience reporting variants from these genes, and we were comfortable accepting the model limitations in this specific non-primary, non-actionable context.  
+We recommend clinical labs initially apply the lowest risk approach (only non-actionable variant calls inside GIAB benchmark regions) and only consider other approaches after careful evaluation. 
+We wish to reiterate that we do not currently recommend clinical labs apply these models to primary or actionable variants due to the increased risk to the patient.  
+Furthermore, labs should be cautious even when applying the models to non-primary, non-actionable variants outside of the benchmark regions until further studies can be conducted to analyze their accuracy outside of GIAB benchmark regions. 

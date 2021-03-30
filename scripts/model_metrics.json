@@ -35,6 +35,8 @@
         }
     },
     "copied" : {
-        "dragen_batch_big" : "dragen_batch"
+        "dragen_batch_big" : "dragen_batch",
+        "strelka-2.9.10-refseq" : "strelka-2.9.10",
+        "dragen-07.021.510.3.5.7" : "dragen-07.011.352.3.2.8b"
     }
 }

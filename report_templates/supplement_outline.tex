@@ -4,6 +4,10 @@
 
 \usepackage[table]{xcolor} %supports coloring single cells in a table
 \usepackage{longtable} %gives multi-page tables
+%the following didn't really work, but it did happen to fix the issue :shrug:
+%https://tex.stackexchange.com/questions/287283/how-to-define-caption-width-in-longtable
+\setlength{\LTcapwidth}{\textwidth}
+
 \usepackage{makecell}
 
 \usepackage{hhline}
@@ -12,6 +16,7 @@
 \usepackage[margin=1in]{geometry}
 \usepackage{pdflscape}
 %\usepackage{url}
+%\usepackage{caption}
 
 %https://tex.stackexchange.com/questions/98388/how-to-make-table-with-rotated-table-headers-in-latex
 \usepackage{adjustbox}
@@ -68,6 +73,9 @@
         \input{{"{"}}{{ '{prefix}_tex/full_results_{aligner}_{caller}.tex'.format(prefix=PREFIX, aligner=aligner, caller=caller) }}}
     {% endfor %}
 {% endfor %}
+
+\newpage
+\input{{"{"}}{{ PREFIX+'_tex/hardcoded_template.tex' }}}
 
 %\input{{"{"}}{{ PREFIX+'_tex/metadata_outline.tex' }}}
 

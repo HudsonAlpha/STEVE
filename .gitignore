@@ -1,3 +1,7 @@
+backup_vcfs
+clinical_models
+compare_fps
+customize_review
 data/HG*
 data/SL362490.vcf.gz
 data/SL362490.vcf.gz.tbi
@@ -6,7 +10,8 @@ data/hg38.fa.fai
 data/hg38_SDF/
 data/md5sum
 data/original_data
-pipeline/
+pip3_freezes
+pipeline*
 results_b37/
 scripts/.snakemake/
 scripts/CompareRTG.py
@@ -15,3 +20,7 @@ scripts/oldStats/
 scripts/*.log
 scripts/run_rtg.sh
 scripts/samples.txt
+temp_features
+temporary_extractions
+test_cases
+test_dir
