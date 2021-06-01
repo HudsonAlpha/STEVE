@@ -5,7 +5,7 @@ from RunTrainingPipeline import parseSlids
 from PipelineConfig import *
 
 #derived from repo 
-PIPELINE_DIRECTORY = '%s/pipeline' % REPO_DIRECTORY
+PIPELINE_DIRECTORY = '%s/pipeline_pcrfree' % REPO_DIRECTORY
 #CONDA_ENV = '%s/scripts/conda_config.yaml' % REPO_DIRECTORY
 EXTRACT_SCRIPT = '%s/scripts/ExtractFeatures.py' % REPO_DIRECTORY
 TRAINING_SCRIPT = '%s/scripts/TrainModels.py' % REPO_DIRECTORY

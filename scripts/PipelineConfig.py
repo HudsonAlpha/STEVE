@@ -8,7 +8,8 @@ REPO_DIRECTORY = '/gpfs/gpfs1/home/jholt/sanger_less_tests'
 #a dictionary containing metadata for the samples
 SAMPLE_JSONS = [
     #'%s/scripts/GIAB_v1.json' % REPO_DIRECTORY
-    '%s/scripts/GIAB_v2.json' % REPO_DIRECTORY
+    #'%s/scripts/GIAB_v2.json' % REPO_DIRECTORY
+    '%s/scripts/GIAB_pcrfree.json' % REPO_DIRECTORY
 ]
 
 #root directory for RTG-based analysis which is expected to conform to a standard directory structure, and contain
@@ -29,7 +30,8 @@ VARIANT_CALLERS = [
 #if you have specific pipelines (i.e. non-pairs, or maybe externally generated), make the appropriate directory 
 # structure (see note above) and hard-code them here
 FULL_PIPES = [
-    ('dragen-07.011.352.3.2.8b', 'dragen-07.011.352.3.2.8b'),
+    #('dragen-07.011.352.3.2.8b', 'dragen-07.011.352.3.2.8b'), #this is what we originally trained with
+    #('dragen-07.021.510.3.5.7', 'dragen-07.021.510.3.5.7'), #this is what follow ups were on
     ('clinical_sentieon-201808.07', 'strelka-2.9.10')
 ]
 

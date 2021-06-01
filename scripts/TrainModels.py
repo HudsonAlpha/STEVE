@@ -198,8 +198,20 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
             fpVals = fpVals[:SUBSET_SIZE]
 
         #now we need to pull out final train/test sets
-        combined_X = np.vstack([tpVals, fpVals])
-        combined_Y = np.array([1]*tpVals.shape[0] + [0]*fpVals.shape[0])
+        if fpVals.shape[0] == 1:
+            '''
+            TODO: this is a hack to make stratify work when there is exactly one false positive; 
+            the issue is that a class represented once can't be split between the train/test; 
+            what is the "correct" way to handle this? 
+            - I don't think the below approach of replicating the FP is the correct approach, it's just the one that works here
+            - We could maybe remove the FP altogether? also seems bad though
+            - maybe it doesn't matter because we really won't use these models due to low N (Complex Het SNV is the failure)
+            '''
+            combined_X = np.vstack([tpVals, fpVals, fpVals])
+            combined_Y = np.array([1]*tpVals.shape[0] + [0, 0])
+        else:
+            combined_X = np.vstack([tpVals, fpVals])
+            combined_Y = np.array([1]*tpVals.shape[0] + [0]*fpVals.shape[0])
         if FLIP_TP:
             combined_Y = 1 - combined_Y
         train_X, test_X, train_Y, test_Y = train_test_split(combined_X, combined_Y, random_state=0, stratify=combined_Y, test_size=TEST_FRACTION)

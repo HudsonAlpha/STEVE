@@ -1,0 +1,42 @@
+{
+    "HALB3002753" : {
+        "sample" : "NA12878",
+        "prep" : "PCR-free-illumina",
+        "analysis" : ["all"]
+    },
+    "HALB3002754" : {
+        "sample" : "HG002",
+        "prep" : "PCR-free-illumina",
+        "analysis" : ["all"]
+    },
+    "HALB3002755" : {
+        "sample" : "HG003",
+        "prep" : "PCR-free-illumina",
+        "analysis" : ["all"]
+    },
+    "HALB3002756" : {
+        "sample" : "HG004",
+        "prep" : "PCR-free-illumina",
+        "analysis" : ["all"]
+    },
+    "HALB3002757" : {
+        "sample" : "HG005",
+        "prep" : "PCR-free-illumina",
+        "analysis" : ["all"]
+    },
+    "HALB3003200" : {
+        "sample" : "NA12878",
+        "prep" : "PCR-free-illumina",
+        "analysis" : ["all"]
+    },
+    "HALB3003201" : {
+        "sample" : "HG002",
+        "prep" : "PCR-free-illumina",
+        "analysis" : ["all"]
+    },
+    "HALB3003222" : {
+        "sample" : "HG003",
+        "prep" : "PCR-free-illumina",
+        "analysis" : ["all"]
+    }
+}

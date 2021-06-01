@@ -22,7 +22,7 @@ TEST_FRACTION = 0.5
 
 #if True, only use SUBSET_SIZE variants from each file (mostly for debugging)
 USE_SUBSET = False
-SUBSET_SIZE = 1000
+SUBSET_SIZE = 10000
 
 #if True, manually remove features in MANUAL_FS_LABELS (these are historically unimportant features)
 MANUAL_FS = True
@@ -53,7 +53,7 @@ ENABLE_XGBOOST = False
 ENABLE_EASYENSEMBLE = False
 
 #this is an experimental mode in sklearn, it may change rapidly from version to version
-ENABLE_HISTGRADIENTBOOST = True
+ENABLE_HISTGRADIENTBOOST = False
 if ENABLE_HISTGRADIENTBOOST:
     #make sure we can actually do what we're trying to do
     try:
@@ -77,6 +77,7 @@ if ENABLE_RANDOMFOREST:
     if you do the grid search, most of your models will be 500 estimators with bootstrap and min_samples_split about
     half-and-half depending on the data type.
     '''
+    #'''
     CLASSIFIERS.append(
         ('RandomForest', RandomForestClassifier(random_state=0, class_weight='balanced', max_depth=4, n_estimators=200, min_samples_split=2, max_features='sqrt'),
         {
@@ -99,6 +100,21 @@ if ENABLE_RANDOMFOREST:
             #'max_samples' : Real(0.1, 1.0, prior='uniform') #TODO: need to update scikit-learn to use this
         })
     )
+    '''
+    #v1 hyperparams
+    CLASSIFIERS.append(
+        ('RandomForest', RandomForestClassifier(random_state=0, class_weight='balanced', max_depth=4, n_estimators=200, min_samples_split=2, max_features='sqrt'),
+        {
+            'random_state' : [0],
+            'class_weight' : ['balanced'],
+            'n_estimators' : [100, 200],
+            'max_depth' : [3, 4],
+            'min_samples_split' : [2],
+            'max_features' : ['sqrt']
+        },
+        {})
+    )
+    #'''
 
 if ENABLE_ADABOOST:
     CLASSIFIERS.append(
@@ -136,6 +152,7 @@ if ENABLE_GRADIENTBOOST:
     low enough to make it a challenge for this model type.
     '''
     #" Most data scientist see number of trees, tree depth and the learning rate as most crucial parameters" - https://www.datacareer.de/blog/parameter-tuning-in-gradient-boosting-gbm/
+    #'''
     CLASSIFIERS.append(
         ('GradientBoosting', GradientBoostingClassifier(random_state=0, learning_rate=0.1, loss='exponential', max_depth=4, max_features='sqrt', n_estimators=200),
         {
@@ -164,6 +181,21 @@ if ENABLE_GRADIENTBOOST:
             'n_iter_no_change' : Categorical([20]) #used to be Integer(10, 20), but i think we can just safely set it to a single medium-sized value so fitting focuses on useful things
         })
     )
+    '''
+    #v1 hyperparams
+    CLASSIFIERS.append(
+        ('GradientBoosting', GradientBoostingClassifier(random_state=0, learning_rate=0.1, loss='exponential', max_depth=4, max_features='sqrt', n_estimators=200),
+        {
+            'random_state' : [0],
+            'n_estimators' : [100, 200],
+            'max_depth' : [3, 4],
+            'learning_rate' : [0.05, 0.1, 0.2],
+            'loss' : ['deviance', 'exponential'],
+            'max_features' : ['sqrt'],
+        },
+        {})
+    )
+    #'''
 
 if ENABLE_XGBOOST:
     '''
