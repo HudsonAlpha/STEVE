@@ -13,6 +13,7 @@ data/original_data
 pip3_freezes
 pipeline*
 results_b37/
+results
 scripts/.snakemake/
 scripts/CompareRTG.py
 scripts/__pycache__/
