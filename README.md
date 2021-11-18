@@ -16,7 +16,7 @@ Inside `PipelineConfig.py` is a set of information describing where files can be
 
 #### Required
 1. `DATA_DIRECTORY` - The full path to a directory containing pipeline outputs. The pipeline assumes that variant files are located at `{DATA_DIRECTORY}/variant_calls/{reference}/{aligner}/{caller}/{sample}.vcf.gz`.  Similarly, it assumes that RTG VCFEval outputs are located at `{DATA_DIRECTORY}/rtg_results/{reference}/{aligner}/{caller}/{sample}`.  Both of these are required for the pipeline to run successfully. NOTE: if using a variant caller that is not specified in `model_metrics.json`, additional steps may be required (see section "Feature Extraction" for details).
-2. `REFERNCES`, `ALIGNERS`, `VARIANT_CALLERS` - Each of these is a list of references, aligners, or variant callers that will be used to populate the paths above (e.g. `{reference}/{aligner}/{caller}`). Every combination of the three lists will be used.
+2. `REFERENCES`, `ALIGNERS`, `VARIANT_CALLERS` - Each of these is a list of references, aligners, or variant callers that will be used to populate the paths above (e.g. `{reference}/{aligner}/{caller}`). Every combination of the three lists will be used.
 3. `FULL_PIPES` - similar to the above options, but this one allows for specific tuple triplets (i.e. instead of every combination).
 
 #### Optional
