@@ -252,9 +252,10 @@ def gatherVcfMetrics(vcfFN, rawVCF, metrics):
 
     return ret, fields
 
-def extractFeatures(aligner, caller, samples, outPrefix):
+def extractFeatures(reference, aligner, caller, samples, outPrefix):
     '''
     This will run the feature extraction after identifying the appropriate inputs
+    @param reference - the reference label that was used upstream
     @param aligner - the aligner that was used upstream
     @param caller - the caller tht was used upstream
     @param samples - a file or string corresponding to the samples (see parseSlids(...) function)
@@ -262,8 +263,8 @@ def extractFeatures(aligner, caller, samples, outPrefix):
     @return - None
     '''
     #0 - constants based on input
-    RTG_ROOT = '%s/rtg_results/%s/%s' % (DATA_DIRECTORY, aligner, caller)
-    VCF_ROOT = '%s/variant_calls/%s/%s' % (DATA_DIRECTORY, aligner, caller)
+    RTG_ROOT = '%s/rtg_results/%s/%s/%s' % (DATA_DIRECTORY, reference, aligner, caller)
+    VCF_ROOT = '%s/variant_calls/%s/%s/%s' % (DATA_DIRECTORY, reference, aligner, caller)
     OUTPUT_ROOT = outPrefix
     CLASSIFICATION_TYPES = ['fp', 'tp']
     VCF_METRICS = ALL_METRICS[caller]
@@ -274,8 +275,8 @@ def extractFeatures(aligner, caller, samples, outPrefix):
     #1 - load the samples
     SAMPLES = parseSlids(samples)
     
-    #2 - make sure results exist for each aligner-caller-sample triplet
-    acDir = '%s/%s/%s' % (OUTPUT_ROOT, aligner, caller)
+    #2 - make sure results exist for each reference-aligner-caller-sample quad
+    acDir = '%s/%s/%s/%s' % (OUTPUT_ROOT, reference, aligner, caller)
     if not os.path.exists(acDir):
         os.makedirs(acDir)
     
@@ -296,8 +297,8 @@ def extractFeatures(aligner, caller, samples, outPrefix):
     #3 - reformat results into feature sets as necessary
     for sample in SAMPLES:
         for ct in CLASSIFICATION_TYPES:
-            outNumpyFN = '%s/%s/%s/%s_%s.npy' % (OUTPUT_ROOT, aligner, caller, sample, ct)
-            outCatFN = '%s/%s/%s/%s_%s_fields.json' % (OUTPUT_ROOT, aligner, caller, sample, ct)
+            outNumpyFN = '%s/%s/%s/%s/%s_%s.npy' % (OUTPUT_ROOT, reference, aligner, caller, sample, ct)
+            outCatFN = '%s/%s/%s/%s/%s_%s_fields.json' % (OUTPUT_ROOT, reference, aligner, caller, sample, ct)
             if not os.path.exists(outNumpyFN) or REGENERATE:
                 print('Building "%s"...' % (outNumpyFN, ))
                 rtgVcfFN = '%s/%s/%s.vcf.gz' % (RTG_ROOT, sample, ct)
@@ -319,15 +320,15 @@ def extractFeatures(aligner, caller, samples, outPrefix):
     fpList = []
 
     #load the fields from the first file
-    fp = open('%s/%s/%s/%s_tp_fields.json' % (OUTPUT_ROOT, aligner, caller, SAMPLES[0]))
+    fp = open('%s/%s/%s/%s/%s_tp_fields.json' % (OUTPUT_ROOT, reference, aligner, caller, SAMPLES[0]))
     fieldsList = json.load(fp)
     fp.close()
     
     #get data from each sample
     for sample in SAMPLES:
         #TP first
-        tpFN = '%s/%s/%s/%s_tp.npy' % (OUTPUT_ROOT, aligner, caller, sample)
-        tpOrder = '%s/%s/%s/%s_tp_fields.json' % (OUTPUT_ROOT, aligner, caller, sample)
+        tpFN = '%s/%s/%s/%s/%s_tp.npy' % (OUTPUT_ROOT, reference, aligner, caller, sample)
+        tpOrder = '%s/%s/%s/%s/%s_tp_fields.json' % (OUTPUT_ROOT, reference, aligner, caller, sample)
         fp = open(tpOrder, 'r')
         tpFields = json.load(fp)
         fp.close()
@@ -336,8 +337,8 @@ def extractFeatures(aligner, caller, samples, outPrefix):
         tpList.append(tpVar)
 
         #now false positives
-        fpFN = '%s/%s/%s/%s_fp.npy' % (OUTPUT_ROOT, aligner, caller, sample)
-        fpOrder = '%s/%s/%s/%s_fp_fields.json' % (OUTPUT_ROOT, aligner, caller, sample)
+        fpFN = '%s/%s/%s/%s/%s_fp.npy' % (OUTPUT_ROOT, reference, aligner, caller, sample)
+        fpOrder = '%s/%s/%s/%s/%s_fp_fields.json' % (OUTPUT_ROOT, reference, aligner, caller, sample)
         fp = open(fpOrder, 'r')
         fpFields = json.load(fp)
         fp.close()
@@ -360,6 +361,7 @@ if __name__ == "__main__":
     #p.add_argument('-d', '--date-subdir', dest='date_subdir', default=None, help='the date subdirectory (default: "hli-YYMMDD")')
     
     #required main arguments
+    p.add_argument('reference', type=str, help='the reference to train on')
     p.add_argument('aligner', type=str, help='the aligner to train on')
     p.add_argument('caller', type=str, help='the variant caller to train on')
     p.add_argument('sample_metadata', type=str, help='a file with sample identifiers')
@@ -368,4 +370,4 @@ if __name__ == "__main__":
     #parse the arguments
     args = p.parse_args()
 
-    extractFeatures(args.aligner, args.caller, args.sample_metadata, args.output_prefix)
+    extractFeatures(args.reference, args.aligner, args.caller, args.sample_metadata, args.output_prefix)

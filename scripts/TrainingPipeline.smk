@@ -22,12 +22,14 @@ def getTrainedModels():
     This will return a list of all models we expect to generate given the above parameters
     '''
     ret = []
-    for al in ALIGNERS:
-        for vc in VARIANT_CALLERS:
-            ret.append('%s/trained_models/%s/%s/models.p' % (PIPELINE_DIRECTORY, al, vc))
     
-    for al, vc in FULL_PIPES:
-        ret.append('%s/trained_models/%s/%s/models.p' % (PIPELINE_DIRECTORY, al, vc))
+    for ref in REFERENCES:
+        for al in ALIGNERS:
+            for vc in VARIANT_CALLERS:
+                ret.append('%s/trained_models/%s/%s/models.p' % (PIPELINE_DIRECTORY, ref, al, vc))
+    
+    for ref, al, vc in FULL_PIPES:
+        ret.append('%s/trained_models/%s/%s/%s/models.p' % (PIPELINE_DIRECTORY, ref, al, vc))
 
     return ret
 
@@ -36,14 +38,15 @@ def getModelSummaries():
     This will return a list of model summaries we expect at this end of this
     '''
     ret = []
-    for al in ALIGNERS:
-        for vc in VARIANT_CALLERS:
-            ret.append('%s/model_summaries/%s/%s/model_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
-            ret.append('%s/model_summaries/%s/%s/strict_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
+    for ref in REFERENCES:
+        for al in ALIGNERS:
+            for vc in VARIANT_CALLERS:
+                ret.append('%s/model_summaries/%s/%s/%s/model_summary.tsv' % (PIPELINE_DIRECTORY, ref, al, vc))
+                ret.append('%s/model_summaries/%s/%s/%s/strict_summary.tsv' % (PIPELINE_DIRECTORY, ref, al, vc))
     
-    for al, vc in FULL_PIPES:
-        ret.append('%s/model_summaries/%s/%s/model_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
-        ret.append('%s/model_summaries/%s/%s/strict_summary.tsv' % (PIPELINE_DIRECTORY, al, vc))
+    for ref, al, vc in FULL_PIPES:
+        ret.append('%s/model_summaries/%s/%s/%s/model_summary.tsv' % (PIPELINE_DIRECTORY, ref, al, vc))
+        ret.append('%s/model_summaries/%s/%s/%s/strict_summary.tsv' % (PIPELINE_DIRECTORY, ref, al, vc))
 
     return ret
 
@@ -52,12 +55,13 @@ def getDataStats():
     This will return a list of data stat files we expect at the end of this
     '''
     ret = []
-    for al in ALIGNERS:
-        for vc in VARIANT_CALLERS:
-            ret.append('%s/feature_stats/%s/%s/feature_stats.tsv' % (PIPELINE_DIRECTORY, al, vc))
+    for ref in REFERENCES:
+        for al in ALIGNERS:
+            for vc in VARIANT_CALLERS:
+                ret.append('%s/feature_stats/%s/%s/%s/feature_stats.tsv' % (PIPELINE_DIRECTORY, ref, al, vc))
     
-    for al, vc in FULL_PIPES:
-        ret.append('%s/feature_stats/%s/%s/feature_stats.tsv' % (PIPELINE_DIRECTORY, al, vc))
+    for ref, al, vc in FULL_PIPES:
+        ret.append('%s/feature_stats/%s/%s/%s/feature_stats.tsv' % (PIPELINE_DIRECTORY, ref, al, vc))
 
     return ret
 
@@ -66,12 +70,13 @@ def getModelEli5s():
     This will return a list of model summaries we expect at this end of this
     '''
     ret = []
-    for al in ALIGNERS:
-        for vc in VARIANT_CALLERS:
-            ret.append('%s/eli5_summaries/%s/%s/model_eli5.json' % (PIPELINE_DIRECTORY, al, vc))
+    for ref in REFERENCES:
+        for al in ALIGNERS:
+            for vc in VARIANT_CALLERS:
+                ret.append('%s/eli5_summaries/%s/%s/%s/model_eli5.json' % (PIPELINE_DIRECTORY, ref, al, vc))
     
-    for al, vc in FULL_PIPES:
-        ret.append('%s/eli5_summaries/%s/%s/model_eli5.json' % (PIPELINE_DIRECTORY, al, vc))
+    for ref, al, vc in FULL_PIPES:
+        ret.append('%s/eli5_summaries/%s/%s/%s/model_eli5.json' % (PIPELINE_DIRECTORY, ref, al, vc))
 
     return ret
 
@@ -97,24 +102,25 @@ rule model_eli5:
 
 rule ExtractFeatures:
     input:
-        rawVcf="%s/variant_calls/{aligner}/{caller}/{slid}.vcf.gz" % DATA_DIRECTORY,
-        tpVcf="%s/rtg_results/{aligner}/{caller}/{slid}/tp.vcf.gz" % DATA_DIRECTORY,
-        fpVcf="%s/rtg_results/{aligner}/{caller}/{slid}/fp.vcf.gz" % DATA_DIRECTORY
+        rawVcf="%s/variant_calls/{reference}/{aligner}/{caller}/{slid}.vcf.gz" % DATA_DIRECTORY,
+        tpVcf="%s/rtg_results/{reference}/{aligner}/{caller}/{slid}/tp.vcf.gz" % DATA_DIRECTORY,
+        fpVcf="%s/rtg_results/{reference}/{aligner}/{caller}/{slid}/fp.vcf.gz" % DATA_DIRECTORY
     output:
-        fp_features="{pipeline_dir}/features/{aligner}/{caller}/{slid}_fp.npy",
-        fp_fields="{pipeline_dir}/features/{aligner}/{caller}/{slid}_fp_fields.json",
-        tp_features="{pipeline_dir}/features/{aligner}/{caller}/{slid}_tp.npy",
-        tp_fields="{pipeline_dir}/features/{aligner}/{caller}/{slid}_tp_fields.json"
+        fp_features="{pipeline_dir}/features/{reference}/{aligner}/{caller}/{slid}_fp.npy",
+        fp_fields="{pipeline_dir}/features/{reference}/{aligner}/{caller}/{slid}_fp_fields.json",
+        tp_features="{pipeline_dir}/features/{reference}/{aligner}/{caller}/{slid}_tp.npy",
+        tp_fields="{pipeline_dir}/features/{reference}/{aligner}/{caller}/{slid}_tp_fields.json"
     params:
         script=EXTRACT_SCRIPT,
         prefix="{pipeline_dir}/features"
     #conda:
     #    CONDA_ENV
-    log: "{pipeline_dir}/logs/features/{aligner}/{caller}/{slid}.log"
+    log: "{pipeline_dir}/logs/features/{reference}/{aligner}/{caller}/{slid}.log"
     threads: 1 #this currently isn't multi-threaded in any way
     shell:
         '''
         python3 -u {params.script} \
+            {wildcards.reference} \
             {wildcards.aligner} \
             {wildcards.caller} \
             {wildcards.slid} \
@@ -133,6 +139,7 @@ def getFeatureFiles(wildcards):
     '''
     #get the wildcards
     pd = wildcards['pipeline_dir']
+    ref = wildcards['reference']
     al = wildcards['aligner']
     vc = wildcards['caller']
     
@@ -148,24 +155,24 @@ def getFeatureFiles(wildcards):
     ret = []
     for slid in SAMPLE_LIST:
         for pf in postFixes:
-            ret.append('%s/features/%s/%s/%s_%s' % (pd, al, vc, slid, pf))
+            ret.append('%s/features/%s/%s/%s/%s_%s' % (pd, ref, al, vc, slid, pf))
     return ret
 
 rule TrainModels:
     input:
         getFeatureFiles
     output:
-        models="{pipeline_dir}/trained_models/{aligner}/{caller}/models.p",
-        rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
-        stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"
+        models="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/models.p",
+        rocs="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/rocs.json",
+        stats="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/stats.json"
     params:
         script=TRAINING_SCRIPT,
-        feature_dir="{pipeline_dir}/features/{aligner}/{caller}",
+        feature_dir="{pipeline_dir}/features/{reference}/{aligner}/{caller}",
         slids=RAW_SLIDS,
-        output_prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+        output_prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}"
     #conda:
     #    CONDA_ENV
-    log: "{pipeline_dir}/logs/trained_models/{aligner}/{caller}_training.log"
+    log: "{pipeline_dir}/logs/trained_models/{reference}/{aligner}/{caller}_training.log"
     threads: THREADS_PER_PROC #only applies to CV, but still a big speedup
     resources:
         mem_mb=128000
@@ -187,13 +194,13 @@ rule SummarizeFeatures:
     input:
         features=getFeatureFiles
     output:
-        summary="{pipeline_dir}/feature_stats/{aligner}/{caller}/feature_stats.tsv"
+        summary="{pipeline_dir}/feature_stats/{reference}/{aligner}/{caller}/feature_stats.tsv"
     params:
         script=DATA_REPORT_SCRIPT,
-        prefix="{pipeline_dir}/features/{aligner}/{caller}"
+        prefix="{pipeline_dir}/features/{reference}/{aligner}/{caller}"
     #conda:
     #    CONDA_ENV
-    log: "{pipeline_dir}/logs/feature_stats/{aligner}/{caller}.log"
+    log: "{pipeline_dir}/logs/feature_stats/{reference}/{aligner}/{caller}.log"
     threads: 1
     shell:
         '''
@@ -204,18 +211,18 @@ rule SummarizeFeatures:
 
 rule SummarizeModels:
     input:
-        models="{pipeline_dir}/trained_models/{aligner}/{caller}/models.p",
-        rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
-        stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"
+        models="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/models.p",
+        rocs="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/rocs.json",
+        stats="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/stats.json"
     output:
-        summary="{pipeline_dir}/model_summaries/{aligner}/{caller}/model_summary.tsv",
-        images=directory("{pipeline_dir}/model_summaries/{aligner}/{caller}/roc_curves")
+        summary="{pipeline_dir}/model_summaries/{reference}/{aligner}/{caller}/model_summary.tsv",
+        images=directory("{pipeline_dir}/model_summaries/{reference}/{aligner}/{caller}/roc_curves")
     params:
         script=MODEL_REPORT_SCRIPT,
-        prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+        prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}"
     #conda:
     #    CONDA_ENV
-    log: "{pipeline_dir}/logs/model_summaries/{aligner}/{caller}.log"
+    log: "{pipeline_dir}/logs/model_summaries/{reference}/{aligner}/{caller}.log"
     threads: 1
     shell:
         '''
@@ -227,17 +234,17 @@ rule SummarizeModels:
 
 rule StrictSummarizeModels:
     input:
-        models="{pipeline_dir}/trained_models/{aligner}/{caller}/models.p",
-        rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
-        stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"
+        models="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/models.p",
+        rocs="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/rocs.json",
+        stats="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/stats.json"
     output:
-        summary="{pipeline_dir}/model_summaries/{aligner}/{caller}/strict_summary.tsv"
+        summary="{pipeline_dir}/model_summaries/{reference}/{aligner}/{caller}/strict_summary.tsv"
     params:
         script=MODEL_REPORT_SCRIPT,
-        prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+        prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}"
     #conda:
     #    CONDA_ENV
-    log: "{pipeline_dir}/logs/model_summaries/{aligner}/{caller}.log"
+    log: "{pipeline_dir}/logs/model_summaries/{reference}/{aligner}/{caller}.log"
     threads: 1
     shell:
         '''
@@ -250,17 +257,17 @@ rule StrictSummarizeModels:
 
 rule ModelEli5:
     input:
-        models="{pipeline_dir}/trained_models/{aligner}/{caller}/models.p",
-        rocs="{pipeline_dir}/trained_models/{aligner}/{caller}/rocs.json",
-        stats="{pipeline_dir}/trained_models/{aligner}/{caller}/stats.json"
+        models="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/models.p",
+        rocs="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/rocs.json",
+        stats="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}/stats.json"
     output:
-        eli5="{pipeline_dir}/eli5_summaries/{aligner}/{caller}/model_eli5.json"
+        eli5="{pipeline_dir}/eli5_summaries/{reference}/{aligner}/{caller}/model_eli5.json"
     params:
         script=MODEL_ELI5_SCRIPT,
-        prefix="{pipeline_dir}/trained_models/{aligner}/{caller}"
+        prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}"
     #conda:
     #    CONDA_ENV
-    log: "{pipeline_dir}/logs/eli5_summaries/{aligner}/{caller}.log"
+    log: "{pipeline_dir}/logs/eli5_summaries/{reference}/{aligner}/{caller}.log"
     threads: 1
     shell:
         '''
