@@ -319,7 +319,7 @@ def trainClassifier(raw_clf, hyperparameters, train_X, train_Y, train_groups, co
             )
         else:
             raise Exception('NO_IMPL')
-        gsClf.fit(train_X, train_Y, train_groups)
+        gsClf.fit(train_X, train_Y, groups=train_groups)
         print('[%s]\t\tBest params: %s' % (str(datetime.datetime.now()), gsClf.best_params_))
         
         print('[%s]\tGathering CV results...'% (str(datetime.datetime.now()), ))

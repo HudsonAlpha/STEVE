@@ -5,7 +5,7 @@ import json
 import numpy as np
 import os
 import re
-import vcf
+import cyvcf2
 
 from PipelineConfig import DATA_DIRECTORY, REPO_DIRECTORY
 from RunTrainingPipeline import parseSlids
@@ -47,43 +47,44 @@ for k in UNPARSED_METRICS['copied']:
     assert(k not in ALL_METRICS)
     ALL_METRICS[k] = ALL_METRICS[UNPARSED_METRICS['copied'][k]]
 
-def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
+def getVariantFeatures(variant, sample_index, fields, rawReader, allowHomRef=False):
     '''
     This function takes a variant from a VCF and a sample ID and extracts the features for it
     @param variant - the variant (from "vcfReader")
-    @param sampleID - the sample in the VCF file
+    @param sample_index - the sample index in the VCF file (0-based)
     @param fields - the fields to extract from the variant
     @param rawReader - the raw VCF file
     @param allowHomRef - if True, this will allow 0/0 calls (otherwise, it throws an error)
     @return - a list of ordered features
     '''
     annots = []
-
-    #first, annotate whether it's a SNP or an indel
-    callStats = variant.genotype(sampleID)
-    if '.' in callStats['GT']:
-        gtPieces = ['0', '0']
-    else:
-        gtPieces = re.split('[/|]', callStats['GT'])
     
-    if len(gtPieces) != 2:
+    #first, annotate whether it's a SNP or an indel
+    gt_pieces = variant.genotypes[sample_index]
+    if len(gt_pieces) != 3:
         #TODO: only a problem in strelka, how to handle it?
-        return None
+        #return None
+        raise Exception(f'Unexpected GT field: {gt_pieces}')
+
+    #explicitly store phasing and sort the GT field (this is important for ref/alt ordering)
+    is_phased = gt_pieces[-1]
+    gt_pieces = sorted(gt_pieces[0:-1])
     
     if not allowHomRef:
-        assert(gtPieces[0] != '0' or gtPieces[1] != '0')
+        assert(gt_pieces[0] != 0 or gt_pieces[1] != 0)
     
     #look at the variant call
-    s1 = (variant.REF if gtPieces[0] == '0' else variant.ALT[int(gtPieces[0])-1])
-    s2 = (variant.REF if gtPieces[1] == '0' else variant.ALT[int(gtPieces[1])-1])
+    s1 = (variant.REF if gt_pieces[0] == 0 else variant.ALT[int(gt_pieces[0])-1])
+    s2 = (variant.REF if gt_pieces[1] == 0 else variant.ALT[int(gt_pieces[1])-1])
+
     if str(s1) == '<NON_REF>' or str(s2) == '<NON_REF>':
         #ignore this one, it's something we can't figure out from a GVCF
         #TODO: do we feel like ever changing this?
         return None
     
     #pull this out for use by all the AD stat fields
-    callAD = callStats['AD']
-    adSum = sum(callAD)
+    call_ad = variant.format('AD')[sample_index]
+    ad_sum = sum(call_ad)
 
     for k, subk in fields:
         if k == 'VAR':
@@ -102,53 +103,59 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
             #these are call specific measures
             # all sub-keys default to a FLOAT interpretation if not specifically handled (see "else" clause)
             if subk == 'GT':
-                if gtPieces[0] == gtPieces[1]:
-                    if gtPieces[0] == '0':
+                if gt_pieces[0] == gt_pieces[1]:
+                    if gt_pieces[0] == 0:
                         val = GT_REF_HOM
                     else:
                         val = GT_ALT_HOM
-                elif gtPieces[0] == '0' or gtPieces[1] == '0':
+                elif gt_pieces[0] == 0 or gt_pieces[1] == 0:
                     val = GT_REF_HET
                 else:
                     val = GT_HET_HET
 
             elif subk == 'AD0':
-                val = (callAD[int(gtPieces[0])] if adSum > 0 else DEFAULT_MISSING)
+                val = (call_ad[int(gt_pieces[0])] if ad_sum > 0 else DEFAULT_MISSING)
 
             elif subk == 'AD1':
-                val = (callAD[int(gtPieces[1])] if adSum > 0 else DEFAULT_MISSING)
+                val = (call_ad[int(gt_pieces[1])] if ad_sum > 0 else DEFAULT_MISSING)
 
             elif subk == 'ADO':
-                if gtPieces[0] == gtPieces[1]:
+                if gt_pieces[0] == gt_pieces[1]:
                     #homozygous, pull AD once
-                    adUsed = callAD[int(gtPieces[0])]
+                    ad_used = call_ad[int(gt_pieces[0])]
                 else:
                     #heterozygous, get both AD vals
-                    adUsed = callAD[int(gtPieces[0])] + callAD[int(gtPieces[1])]
+                    ad_used = call_ad[int(gt_pieces[0])] + call_ad[int(gt_pieces[1])]
                 
                 #AD-other is the total AD minus the GT AD
-                val = ((adSum - adUsed) if adSum > 0 else DEFAULT_MISSING)
+                val = ((ad_sum - ad_used) if ad_sum > 0 else DEFAULT_MISSING)
 
             elif subk == 'AF0':
-                val = (callAD[int(gtPieces[0])] / adSum if adSum > 0 else DEFAULT_MISSING)
+                val = (call_ad[int(gt_pieces[0])] / ad_sum if ad_sum > 0 else DEFAULT_MISSING)
 
             elif subk == 'AF1':
-                val = (callAD[int(gtPieces[1])] / adSum if adSum > 0 else DEFAULT_MISSING)
+                val = (call_ad[int(gt_pieces[1])] / ad_sum if ad_sum > 0 else DEFAULT_MISSING)
 
             elif subk == 'AFO':
-                if gtPieces[0] == gtPieces[1]:
+                if gt_pieces[0] == gt_pieces[1]:
                     #homozygous, pull AD once
-                    adUsed = callAD[int(gtPieces[0])]
+                    adUsed = call_ad[int(gt_pieces[0])]
                 else:
                     #heterozygous, get both AD vals
-                    adUsed = callAD[int(gtPieces[0])] + callAD[int(gtPieces[1])]
+                    adUsed = call_ad[int(gt_pieces[0])] + call_ad[int(gt_pieces[1])]
                 
                 #AD-other is the total AD minus the GT AD
-                val = ((adSum - adUsed) / adSum if adSum > 0 else DEFAULT_MISSING)
+                val = ((ad_sum - ad_used) / ad_sum if ad_sum > 0 else DEFAULT_MISSING)
+            
+            elif subk == 'min(PL)':
+                #this is the phred likelihoods, one of which should always be zero
+                pl_values = list(variant.format('PL')[sample_index])
+                pl_values.remove(0)
+                val = min(pl_values)
 
             else:
                 try:
-                    val = float(callStats[subk])
+                    val = float(variant.format(subk)[sample_index])
                 except AttributeError as e:
                     #TODO: is this okay for everything?
                     val = DEFAULT_MISSING
@@ -157,7 +164,7 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
         elif k == 'INFO':
             #get from the INFO column
             # all values here default to a FLOAT interpretation
-            val = (float(variant.INFO[subk]) if (subk in variant.INFO) else DEFAULT_MISSING)
+            val = float(variant.INFO.get(subk, DEFAULT_MISSING))
             annots.append(val)
         
         elif k == 'MUNGED':
@@ -184,17 +191,27 @@ def getVariantFeatures(variant, sampleID, fields, rawReader, allowHomRef=False):
                 #search the raw VCF for nearby calls
                 nearbyFound = 0
                 BUFFER = 20
-                for rawVariant in rawReader.fetch(variant.CHROM, variant.POS-BUFFER, variant.POS+BUFFER):
+                for rawVariant in rawReader(f'{variant.CHROM}:{variant.POS-BUFFER}-{variant.POS+BUFFER}'):
                     if rawVariant.POS != variant.POS:
-                        rawData = rawVariant.genotype(sampleID)
-                        if rawData['GT'] not in ['./.', '0/0']:
+                        raw_gt = rawVariant.genotypes[sample_index]
+                        assert(len(raw_gt) == 3)
+                        if raw_gt[0] > 0 or raw_gt[1] > 0:
                             nearbyFound += 1
                             
                 annots.append(nearbyFound)
 
             elif subk == 'FILTER':
-                #store the number of filters applied (PASS doesn't show up in these lists)
-                annots.append(len(variant.FILTER))
+                #store the number of filters applied
+                if variant.FILTERS:
+                    if 'PASS' in variant.FILTERS:
+                        #PASS can show up here, if it exist we want to remove it from the count
+                        val = len(variant.FILTERS)-1
+                    else:
+                        #else just count up all the filters
+                        val = len(variant.FILTERS)
+                else:
+                    val = 0
+                annots.append(val)
 
             elif subk == 'ID':
                 #this is basically a boolean flag capturing if the variant has an ID annotation
@@ -223,13 +240,13 @@ def gatherVcfMetrics(vcfFN, rawVCF, metrics):
     fields = []
 
     #open up the VCF file
-    vcfReader = vcf.Reader(filename=vcfFN, compressed=True)
-    rawReader = vcf.Reader(filename=rawVCF, compressed=True)
+    vcfReader = cyvcf2.VCF(vcfFN)
+    rawReader = cyvcf2.VCF(rawVCF)
 
-    #get the sample
+    #get the sample, right now we are enforcing one sample per VCF
     samples = vcfReader.samples
     assert(len(samples) == 1)
-    sampleID = samples[0]
+    sample_index = 0
     
     #fill out the fields; always include a variant type field
     fields.append(('VAR', 'TYPE'))
@@ -243,7 +260,15 @@ def gatherVcfMetrics(vcfFN, rawVCF, metrics):
     
     #now we go through
     for variant in vcfReader:
-        annots = getVariantFeatures(variant, sampleID, fields, rawReader)
+        annots = getVariantFeatures(variant, sample_index, fields, rawReader)
+        assert(len(annots) == len(fields))
+        '''
+        print(annots)
+        for i, f in enumerate(fields):
+            print(i, f, annots[i], sep='\t')
+        print()
+        exit()
+        '''
         if annots != None:
             ret.append(annots)
             if len(ret) % 100000 == 0:
