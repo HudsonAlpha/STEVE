@@ -25,7 +25,7 @@ USE_SUBSET = False
 SUBSET_SIZE = 10000
 
 #if True, manually remove features in MANUAL_FS_LABELS (these are historically unimportant features)
-MANUAL_FS = True
+MANUAL_FS = False
 MANUAL_FS_LABELS = ['CALL-ADO', 'CALL-AFO']
 
 #if True, mark false positive as true positives and vice versa
