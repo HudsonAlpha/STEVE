@@ -14,7 +14,7 @@ REPO_DIRECTORY = f'{JHOLT_HOME}/sanger_less_tests'
 SAMPLE_JSONS = [
     #'%s/scripts/GIAB_v1.json' % REPO_DIRECTORY
     #'%s/scripts/GIAB_v2.json' % REPO_DIRECTORY
-    f'{REPO_DIRECTORY}/scripts/GIAB_pcrfree.json'
+    f'{REPO_DIRECTORY}/sample_metadata/GIAB_pcrfree.json'
 ]
 
 #root directory for RTG-based analysis which is expected to conform to a standard directory structure, and contain

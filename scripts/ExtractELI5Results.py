@@ -60,7 +60,7 @@ def gatherClinicalModelStats(allStats, acceptedRecall, targetRecall, allModels):
             coreFeatureNames = [tuple(f.split('-')) for f in allModels[k][bestModelName]['FEATURES']]
             
             #get the weights and add it to the result
-            weights = eli5.explain_weights(clf, feature_names=['-'.join(cfn) for cfn in coreFeatureNames])
+            weights = eli5.explain_weights(clf, feature_names=['-'.join(cfn) for cfn in coreFeatureNames], top=None)
             dictForm = eli5.formatters.as_dict.format_as_dict(weights)
             ret[reformKey] = {
                 'best_model' : bestModelName,
