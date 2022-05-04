@@ -5,7 +5,7 @@ import json
 import numpy as np
 import pickle
 import re
-import vcf
+#import vcf
 
 from ExtractFeatures import ALL_METRICS, getVariantFeatures, GT_TRANSLATE, VAR_TRANSLATE
 
