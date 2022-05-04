@@ -219,6 +219,10 @@ def getVariantFeatures(variant, sample_index, fields, rawReader, allowHomRef=Fal
 
             else:
                 raise Exception('Unhandled computed measurement: %s-%s' % (k, subk))
+        elif k == 'IGNORE':
+            #this is just a dummy parameter we can ignore
+            #historically, these were tested and found to be uninformative to the models
+            pass
         else:
             raise Exception('Unexpected metric key: %s' % (k, ))
 

@@ -38,12 +38,15 @@
                 "AD0", "AD1", "ADO", "AF0", "AF1", "AFO", "GT", "DP", "GQ", "min(PL)"
             ],
             "INFO" : [
-                "BaseQRankSum", "ClippingRankSum", "DP", "Entropy", "ExcessHet", 
-                "FS", "GC", "ML_PROB", "MQ", "MQ0", 
-                "MQRankSum", "NBQ", "QD", "ReadPosEndDist", "ReadPosRankSum", "SOR", "STR", "UDP"
+                "BaseQRankSum", "DP", "Entropy", "GC", "ML_PROB", "MQ", "MQ0",
+                "MQRankSum", "NBQ", "QD", "ReadPosEndDist", "ReadPosRankSum", 
+                "SOR", "UDP"
             ],
             "MUNGED" : [
-                "QUAL", "NEARBY", "FILTER", "ID"
+                "DP_DP", "QUAL", "NEARBY", "ID"
+            ],
+            "IGNORE" : [
+                "MUNGED-FILTER", "INFO-ExcessHet", "INFO-STR", "INFO-ClippingRankSum", "INFO-FS"
             ]
         }
     },
