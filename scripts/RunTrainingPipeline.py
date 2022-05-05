@@ -113,6 +113,7 @@ if __name__ == "__main__":
     p.add_argument('-t', '--train-models', dest='train_models', action='store_true', default=False, help='train the models using the pipeline structure (default: False)')
     p.add_argument('-u', '--unlock', dest='unlock', action='store_true', default=False, help='unlock the directory in the event of snakemake failure (default: False)')
     p.add_argument('-x', '--execute', dest='execute', action='store_true', default=False, help='execute the commands (default: False)')
+    p.add_argument('-C', '--clean', dest='clean', action='store_true', default=False, help='clean all output files (default: False)')
 
     #required main arguments
     p.add_argument('slids', type=str, help='sample labels (.json, .txt, comma-separated entry)')
@@ -163,6 +164,9 @@ if __name__ == "__main__":
         buildFrags.append('model_eli5')
 
     if somethingToDo:
+        if args.clean:
+            buildFrags.append('--delete-all-output')
+
         fullCmd = ' '.join(snakemakeFrags+buildFrags)
         print('Executing: ')
         print(fullCmd)

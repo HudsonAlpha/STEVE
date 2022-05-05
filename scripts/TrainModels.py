@@ -15,6 +15,7 @@ from sklearn.metrics import roc_curve
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
 from sklearn.utils import shuffle
 from skopt import BayesSearchCV
@@ -251,10 +252,35 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
             passParams = rangeHyperparams
         else:
             passParams = hyperparameters
-        fullClf, sumRet, sumRocRet = trainClassifier(raw_clf, passParams, final_train_X, final_train_Y, final_train_groups, configuration)
+
+        if ENABLE_FEATURE_SELECTION:
+            pipeline_clf = Pipeline(
+                [
+                    #this is a relatively small and relatively shallow GBC
+                    ("reduce_dim", 'passthrough'),
+                    #now the main classifier
+                    ("classifier", raw_clf)
+                ]
+            )
+            new_params = {
+                'reduce_dim' : FEATURE_SELECTION_MODELS
+            }
+            for k in passParams.keys():
+                new_key = f'classifier__{k}'
+                new_params[new_key] = passParams[k]
+            passParams = new_params
+        else:
+            pipeline_clf = raw_clf 
+
+        fullClf, sumRet, sumRocRet = trainClassifier(pipeline_clf, passParams, final_train_X, final_train_Y, final_train_groups, configuration)
 
         if label == 'GradientBoosting':
-            print('n_estimators_', fullClf.n_estimators_)
+            if ENABLE_FEATURE_SELECTION:
+                print('n_estimators_', fullClf[1].n_estimators_)
+            else:
+                print('n_estimators_', fullClf.n_estimators_)
+        if ENABLE_FEATURE_SELECTION:
+            print('support_', fullClf[0].support_)
         #this is the test on the held out test set
         print('[%s]\tFull testing classifier...' % (str(datetime.datetime.now()), ))
         resultsDict = testClassifier(fullClf, final_train_X, final_train_Y, final_test_X, final_test_Y)

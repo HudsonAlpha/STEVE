@@ -43,6 +43,9 @@ fp.close()
 ALL_METRICS = {}
 for k in UNPARSED_METRICS['defined']:
     ALL_METRICS[k] = UNPARSED_METRICS['defined'][k]
+    if 'IGNORE' in ALL_METRICS[k]:
+        #these are metrics we are tracking but ignoring; usually they were tested but uninformative for the models
+        del ALL_METRICS[k]['IGNORE']
 for k in UNPARSED_METRICS['copied']:
     assert(k not in ALL_METRICS)
     ALL_METRICS[k] = ALL_METRICS[UNPARSED_METRICS['copied'][k]]
@@ -165,6 +168,8 @@ def getVariantFeatures(variant, sample_index, fields, rawReader, allowHomRef=Fal
             #get from the INFO column
             # all values here default to a FLOAT interpretation
             val = float(variant.INFO.get(subk, DEFAULT_MISSING))
+            if np.isnan(val):
+                val = DEFAULT_MISSING
             annots.append(val)
         
         elif k == 'MUNGED':
@@ -173,7 +178,9 @@ def getVariantFeatures(variant, sample_index, fields, rawReader, allowHomRef=Fal
                 #call depth / total variant depth; usually ~1.0 if single sample
                 try:
                     dpCall = callStats['DP']
-                    dpVar = variant.INFO['DP']
+                    dpVar = variant.INFO.get('DP', DEFAULT_MISSING)
+                    if dpVar == 0 or dpVar == DEFAULT_MISSING:
+                        raise Exception('found the error')
                     dpRat = dpCall / dpVar
                     annots.append(dpRat)
                 except:
@@ -219,12 +226,14 @@ def getVariantFeatures(variant, sample_index, fields, rawReader, allowHomRef=Fal
 
             else:
                 raise Exception('Unhandled computed measurement: %s-%s' % (k, subk))
-        elif k == 'IGNORE':
-            #this is just a dummy parameter we can ignore
-            #historically, these were tested and found to be uninformative to the models
-            pass
         else:
             raise Exception('Unexpected metric key: %s' % (k, ))
+
+    if np.isnan(annots).sum() > 0 or np.isinf(annots).sum() > 0:
+        print(variant)
+        for i, f in enumerate(fields):
+            print('', i, f, annots[i], sep='\t')
+        raise Exception('NaN or inf found found, this should not happen')
 
     return annots
 

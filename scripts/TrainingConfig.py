@@ -2,7 +2,9 @@
 from imblearn.ensemble import EasyEnsembleClassifier
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import RFECV
 from sklearn.tree import DecisionTreeClassifier
 from skopt.space import Real, Categorical, Integer
 from xgboost import XGBClassifier
@@ -27,6 +29,25 @@ SUBSET_SIZE = 10000
 #if True, manually remove features in MANUAL_FS_LABELS (these are historically unimportant features)
 MANUAL_FS = False
 MANUAL_FS_LABELS = ['CALL-ADO', 'CALL-AFO']
+
+#if True, this will pre-pend an automated feature selection step to each pipeline
+ENABLE_FEATURE_SELECTION = True
+FEATURE_SELECTION_MODELS = [
+    RFECV(
+        estimator=RandomForestClassifier(
+            random_state=0, class_weight='balanced', n_estimators=50, max_depth=3, max_features='sqrt'
+        ),
+        scoring='roc_auc',
+        cv=5
+    ),
+    RFECV(
+        estimator=GradientBoostingClassifier(
+            random_state=0, loss='exponential', n_estimators=50, max_depth=3, max_features='sqrt'
+        ), 
+        scoring='roc_auc', 
+        cv=5
+    )
+]
 
 #if True, mark false positive as true positives and vice versa
 FLIP_TP = True
@@ -53,14 +74,7 @@ ENABLE_XGBOOST = False
 ENABLE_EASYENSEMBLE = False
 
 #this is an experimental mode in sklearn, it may change rapidly from version to version
-ENABLE_HISTGRADIENTBOOST = False
-if ENABLE_HISTGRADIENTBOOST:
-    #make sure we can actually do what we're trying to do
-    try:
-        from sklearn.experimental import enable_hist_gradient_boosting
-        from sklearn.ensemble import HistGradientBoostingClassifier
-    except:
-        ENABLE_HISTGRADIENTBOOST = False
+ENABLE_HISTGRADIENTBOOST = True
 
 #here is where we put what each enable option indicates
 #now enumerate the models as a tuple (
@@ -83,7 +97,7 @@ if ENABLE_RANDOMFOREST:
         {
             'random_state' : [0],
             'class_weight' : ['balanced'],
-            'n_estimators' : [500], #prior tests: 100, 200, 300
+            'n_estimators' : [200], #prior tests: 100, 200, 300, 500 - technically 500 was best, but you really get marginal gains
             'max_depth' : [6], #prior tests: 3, 4, 5
             'min_samples_split' : [2, 50],
             'max_features' : ['sqrt'],
@@ -117,10 +131,10 @@ if ENABLE_RANDOMFOREST:
     #'''
 
 if ENABLE_ADABOOST:
+    '''
+    Generally slower and worse results than other models, disabled after v1.
+    '''
     CLASSIFIERS.append(
-        '''
-        Generally slower and worse results than other models, disabled after v1.
-        '''
         #"The most important parameters are base_estimator, n_estimators, and learning_rate" - https://chrisalbon.com/machine_learning/trees_and_forests/adaboost_classifier/
         ('AdaBoost', AdaBoostClassifier(random_state=0, algorithm='SAMME.R', learning_rate=1.0, base_estimator=DecisionTreeClassifier(max_depth=2), n_estimators=200),
         {
@@ -257,10 +271,10 @@ if ENABLE_HISTGRADIENTBOOST:
         ('HistGradientBoosting', HistGradientBoostingClassifier(random_state=0),
         {
             'random_state' : [0],
-            'learning_rate' : [0.05, 0.1], #high learning rates don't seem to work out very well
+            'learning_rate' : [0.05, 0.1, 0.2], #high learning rates don't seem to work out very well
             'max_iter' : [1000],
-            'max_leaf_nodes' : [31], #don't want to make this too high or it overfits
-            'min_samples_leaf' : [200, 2000], #want this to be semi-high to avoid overfitting to a few variants
+            'max_leaf_nodes' : [15, 31, 63], #don't want to make this too high or it overfits
+            'min_samples_leaf' : [20, 200, 2000], #want this to be semi-high to avoid overfitting to a few variants
             'validation_fraction' : [0.1],
             'n_iter_no_change' : [20]
         },

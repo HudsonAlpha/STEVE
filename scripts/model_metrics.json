@@ -35,18 +35,17 @@
         },
         "dnascope-1.0-202112.01-PO" : {
             "CALL" : [
-                "AD0", "AD1", "ADO", "AF0", "AF1", "AFO", "GT", "DP", "GQ", "min(PL)"
+                "AD0", "AD1", "ADO", "AF0", "AF1", 
+                "AFO", "GT", "DP", "GQ", "min(PL)"
             ],
             "INFO" : [
-                "BaseQRankSum", "DP", "Entropy", "GC", "ML_PROB", "MQ", "MQ0",
+                "BaseQRankSum", "ClippingRankSum", "DP", "Entropy", "ExcessHet", 
+                "FS", "GC", "ML_PROB", "MQ", "MQ0",
                 "MQRankSum", "NBQ", "QD", "ReadPosEndDist", "ReadPosRankSum", 
-                "SOR", "UDP"
+                "SOR", "STR", "UDP"
             ],
             "MUNGED" : [
-                "DP_DP", "QUAL", "NEARBY", "ID"
-            ],
-            "IGNORE" : [
-                "MUNGED-FILTER", "INFO-ExcessHet", "INFO-STR", "INFO-ClippingRankSum", "INFO-FS"
+                "DP_DP", "FILTER", "ID", "NEARBY", "QUAL"
             ]
         }
     },
