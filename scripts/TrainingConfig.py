@@ -24,27 +24,27 @@ TEST_FRACTION = 0.5
 
 #if True, only use SUBSET_SIZE variants from each file (mostly for debugging)
 USE_SUBSET = False
-SUBSET_SIZE = 10000
+SUBSET_SIZE = 100000
 
 #if True, manually remove features in MANUAL_FS_LABELS (these are historically unimportant features)
 MANUAL_FS = False
 MANUAL_FS_LABELS = ['CALL-ADO', 'CALL-AFO']
 
 #if True, this will pre-pend an automated feature selection step to each pipeline
+#WARNING: this can be a time-consuming process, the reduce run-time increase FS_STEP_SIZE and/or FS_MIN_FEATURE_COUNT
 ENABLE_FEATURE_SELECTION = True
+FS_MIN_FEATURE_COUNT = 10 #always keep at least this many features
+FS_STEP_SIZE = 1 #if an int, the number of features to remove at each step; if a float, the fraction of features to remove at each step
 FEATURE_SELECTION_MODELS = [
     RFECV(
-        estimator=RandomForestClassifier(
-            random_state=0, class_weight='balanced', n_estimators=50, max_depth=3, max_features='sqrt'
-        ),
-        scoring='roc_auc',
-        cv=5
-    ),
-    RFECV(
+        #this is a relatively fast estimator; low tree count, shallow trees, and small sub-sample
         estimator=GradientBoostingClassifier(
-            random_state=0, loss='exponential', n_estimators=50, max_depth=3, max_features='sqrt'
+            random_state=0, loss='exponential', n_estimators=50, max_depth=3, max_features='sqrt',
+            subsample=0.25
         ), 
-        scoring='roc_auc', 
+        scoring='roc_auc',
+        step=FS_STEP_SIZE,
+        min_features_to_select=FS_MIN_FEATURE_COUNT,
         cv=5
     )
 ]
@@ -57,7 +57,7 @@ FLIP_TP = True
 CLASSIFIERS = []
 
 #Generally slight underperformance, but is a decent backup
-ENABLE_RANDOMFOREST = True
+ENABLE_RANDOMFOREST = False
 
 #performs alright, but always seems to be below GradientBoostingClassifier and slower
 ENABLE_ADABOOST = False
@@ -74,7 +74,7 @@ ENABLE_XGBOOST = False
 ENABLE_EASYENSEMBLE = False
 
 #this is an experimental mode in sklearn, it may change rapidly from version to version
-ENABLE_HISTGRADIENTBOOST = True
+ENABLE_HISTGRADIENTBOOST = False
 
 #here is where we put what each enable option indicates
 #now enumerate the models as a tuple (
@@ -101,7 +101,8 @@ if ENABLE_RANDOMFOREST:
             'max_depth' : [6], #prior tests: 3, 4, 5
             'min_samples_split' : [2, 50],
             'max_features' : ['sqrt'],
-            'bootstrap' : [True, False]
+            'bootstrap' : [True],
+            'max_samples' : [0.25, 0.5]
         },
         {
             'random_state' : Categorical([0]),
@@ -172,8 +173,8 @@ if ENABLE_GRADIENTBOOST:
         {
             'random_state' : [0],
             'n_estimators' : [1000], #prior tests: 100, 200; OBSOLETE: since adding n_iter_no_change, just set to a big number
-            'max_depth' : [6], #prior tests: 3, 4
-            'learning_rate' : [0.05, 0.1, 0.5], #prior tests: 0.01, 0.2; from bayes mode, all results were in the 0.04-0.2 range with the occasional "high" rate near 0.5
+            'max_depth' : [3, 6], #prior tests: 3, 4
+            'learning_rate' : [0.05, 0.1, 0.2], #prior tests: 0.01, 0.2; from bayes mode, all results were in the 0.04-0.2 range with the occasional "high" rate near 0.5 - this was very rare though
             'loss' : ['exponential'], #prior tests: 'deviance'
             'max_features' : ['sqrt'],
             'min_samples_split' : [2, 15, 50], #mostly extremes in Bayes most, but adding 15 for middle-ground that was sometimes chosen
@@ -271,10 +272,10 @@ if ENABLE_HISTGRADIENTBOOST:
         ('HistGradientBoosting', HistGradientBoostingClassifier(random_state=0),
         {
             'random_state' : [0],
-            'learning_rate' : [0.05, 0.1, 0.2], #high learning rates don't seem to work out very well
+            'learning_rate' : [0.05, 0.1], #high learning rates don't seem to work out very well
             'max_iter' : [1000],
-            'max_leaf_nodes' : [15, 31, 63], #don't want to make this too high or it overfits
-            'min_samples_leaf' : [20, 200, 2000], #want this to be semi-high to avoid overfitting to a few variants
+            'max_leaf_nodes' : [15, 31], #don't want to make this too high or it overfits
+            'min_samples_leaf' : [20, 200], #want this to be semi-high to avoid overfitting to a few variants
             'validation_fraction' : [0.1],
             'n_iter_no_change' : [20]
         },

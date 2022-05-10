@@ -47,7 +47,7 @@ FULL_PIPES = [
 ]
 
 #pipeline parameters, thread count currently only applies to the actual model training (CV to be precise)
-THREADS_PER_PROC = 33 #was 16 in v1
+THREADS_PER_PROC = 48 #was 16 in v1
 
 ############################################################
 #Documentation config
