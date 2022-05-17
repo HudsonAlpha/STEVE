@@ -199,10 +199,14 @@ def getTrainingResults(pipeline, reference, aligner, caller, strict=False):
         if l.startswith('[clinical_model'):
             pieces = l.rstrip()[1:-1].split(' ')
             assert(pieces[0] == 'clinical_model')
-            assert(pieces[1].startswith('min='))
-            assert(pieces[2].startswith('tar='))
-            clinicalMinimum = float(pieces[1][4:])
-            clinicalTarget = float(pieces[2][4:])
+            if pieces[1].startswith('min=') and pieces[2].startswith('tar='):
+                clinicalMinimum = float(pieces[1][4:])
+                clinicalTarget = float(pieces[2][4:])
+            elif pieces[1].startswith('target_global_precision='):
+                clinicalMinimum = 'dynamic'
+                clinicalTarget = 'dynamic'
+            else:
+                raise Exception('unknown clinical_model format')
             break
         elif l.startswith('['):
             vt, tpcount, fpcount = l.rstrip()[1:-1].split(' ')

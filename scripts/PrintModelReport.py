@@ -11,13 +11,15 @@ import pickle
 from EvaluateVariants import getClinicalModel
 from ExtractFeatures import GT_TRANSLATE, VAR_TRANSLATE
 
-def printAllStats(modelDir, rocDir, minRecall, targetRecall):
+def printAllStats(modelDir, rocDir, minRecall, targetRecall, global_precision):
     '''
     This will print out our model statistics in an ingestible format
     @param modelDir - the model directory 
     @param rocDir - a directory for output ROC curve images
     @param minRecall - the minimum recall values allowed
     @param targetRecall - the target recall we want the models to achieve
+    @param global_precision - float value indicating target global precision; if set, 
+        then it will dynamically figure out the target recalls based on the data
     '''
     #read in the stats
     jsonFN = '%s/stats.json' % (modelDir, )
@@ -48,7 +50,7 @@ def printAllStats(modelDir, rocDir, minRecall, targetRecall):
         if rocDir != None:
             createRocImage(reformKey, rocs[k], rocDir)
     
-    imageDict = printClinicalModels(stats, minRecall, targetRecall, models)
+    imageDict = printClinicalModels(stats, minRecall, targetRecall, models, global_precision)
     if rocDir != None:
         createTrainingImage(imageDict, rocDir)
 
@@ -142,24 +144,33 @@ def createTrainingImage(imageDict, rocDir):
     plt.savefig(outFN)
     plt.close()
 
-def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels):
+def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels, global_precision):
     header = [
         'variant_type', 'best_model', 'model_eval',
         'CV_recall', 'final_recall', 'CV_FPR', 'final_FPR'
     ]
-    print('[clinical_model min=%0.4f tar=%0.4f]' % (acceptedRecall, targetRecall))
+    if global_precision == None:
+        print('[clinical_model min=%0.4f tar=%0.4f]' % (acceptedRecall, targetRecall))
+    else:
+        print('[clinical_model target_global_precision=%0.4f]' % (global_precision, ))
+        header += ['target_recall', 'global_prec']
     print(*header, sep='\t')
     imageDict = {}
     for k in sorted(allStats.keys()):
         stats = allStats[k]
         reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
 
-        clinDict = getClinicalModel(stats, acceptedRecall, targetRecall)
+        clinDict = getClinicalModel(stats, acceptedRecall, targetRecall, global_precision)
         bestModelName = clinDict['model_name']
 
         if bestModelName == None:
             #this is the unfortunate event that NO model passes 
-            print(reformKey, 'None', 'None', '--', '--', '--', '--', sep='\t')
+            rowVals = [
+                reformKey, 'None', 'None', '--', '--', '--', '--'
+            ]
+            if global_precision:
+                rowVals += ['--', '--']
+            print(*rowVals, sep='\t')
         else:
             bestModelTargetRecall = clinDict['eval_recall']
 
@@ -182,6 +193,15 @@ def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels):
                 #str(stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_TPR']),
                 #str(stats[bestModelName]['LEAVEONEOUT_SUMMARY'][bestModelTargetRecall]['TEST_FPR'])
             ]
+            if global_precision:
+                base_precision = clinDict['base_precision']
+                derived_recall = clinDict['derived_recall']
+                calculated_precision = base_precision + (1 - base_precision) * bestTPR
+                rowVals += [
+                    '%0.4f' % (derived_recall, ),
+                    '%0.6f' % (calculated_precision, )
+                ]
+
             print(*rowVals, sep='\t')
 
             imageDict[reformKey] = (
@@ -203,6 +223,7 @@ if __name__ == "__main__":
     p.add_argument('-r', '--roc-dir', dest='roc_dir', default=None, help='a directory to store ROC images (default: None)')
     p.add_argument('-m', '--min-recall', dest='min_recall', default=0.99, type=float, help='the minimum recall for clinical applications (default: 0.990)')
     p.add_argument('-t', '--target-recall', dest='target_recall', default=0.995, type=float, help='the target recall for clinical applications (default: 0.995)')
+    p.add_argument('-g', '--global-precision', dest='global_precision', default=None, type=float, help='the global precision target; if set, override min/target recalls (default: None)')
 
     #required main arguments
     p.add_argument('model_directory', type=str, help='directory with models and model stats')
@@ -210,4 +231,4 @@ if __name__ == "__main__":
     #parse the arguments
     args = p.parse_args()
 
-    printAllStats(args.model_directory, args.roc_dir, args.min_recall, args.target_recall)
+    printAllStats(args.model_directory, args.roc_dir, args.min_recall, args.target_recall, args.global_precision)

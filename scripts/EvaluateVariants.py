@@ -9,16 +9,42 @@ import re
 
 from ExtractFeatures import ALL_METRICS, getVariantFeatures, GT_TRANSLATE, VAR_TRANSLATE
 
-def getClinicalModel(stats, acceptedRecall, targetRecall):
+def getClinicalModel(stats, acceptedRecall, targetRecall, global_precision):
     '''
     @param stats - the stats dictionary from training
     @param acceptedRecall - the minimum acceptable recall
-    @param targetRecall - the target we are aiming for 
-    @return - a dictionary with the eval recall, model name, and harmonic mean score
+    @param targetRecall - the target we are aiming for, must be greater than or equal to accepted
+    @param global_precision - float value indicating target global precision; if set, 
+        then it will dynamically figure out the target recalls based on the data
+    @return - a dictionary with the eval recall, model name, and harmonic mean score; more info is added if global_precision is used
     '''
     bestModelTargetRecall = None
     bestModelName = None
     bestHM = 0.0
+
+    if global_precision != None:
+        #we need to override the accepted and target recall values
+        #print(stats.keys())
+        lookup_key = list(stats.keys())[0]
+        base_total_tp = stats[lookup_key]['RAW_TOTAL_TP']
+        base_total_fp = stats[lookup_key]['RAW_TOTAL_FP']
+        base_precision = base_total_tp / (base_total_fp + base_total_tp)
+
+        #figure out how far from the goal we are
+        delta_precision = global_precision - base_precision
+        assert(delta_precision > 0)
+        remainder_precision = 1.0 - base_precision
+
+        #now derive our target recall from that difference
+        derived_recall = delta_precision / remainder_precision
+
+        #for now, just set both accepted and target to that same value
+        acceptedRecall = derived_recall
+        targetRecall = derived_recall
+    
+    #check these after we potentially override any passed in values
+    assert(targetRecall >= acceptedRecall)
+
     for mn in stats.keys():
         for tr in stats[mn]['ALL_SUMMARY']:
             #CM = confusion matrix
@@ -40,9 +66,17 @@ def getClinicalModel(stats, acceptedRecall, targetRecall):
                 else:
                     #in clinical, best is harmonic mean of our adjusted recall and our TNR
                     modelTNR = modelCM[0, 0] / (modelCM[0, 0] + modelCM[0, 1])
-                    adjRecall = (modelRecall - acceptedRecall) / (float(targetRecall) - acceptedRecall)
-                    if adjRecall > 1.0:
-                        adjRecall = 1.0
+                    if targetRecall == acceptedRecall:
+                        #target and accepted are identical, so this is a binary kill switch that's either 1.0 or 0.0
+                        if modelRecall >= acceptedRecall:
+                            adjRecall = 1.0
+                        else:
+                            adjRecall = 0.0
+                    else:
+                        #otherwise, there's a scale
+                        adjRecall = (modelRecall - acceptedRecall) / (targetRecall - acceptedRecall)
+                        if adjRecall > 1.0:
+                            adjRecall = 1.0
                     modelHM = 2 * adjRecall * modelTNR / (adjRecall+modelTNR)
                     
             if modelHM > bestHM:
@@ -50,11 +84,16 @@ def getClinicalModel(stats, acceptedRecall, targetRecall):
                 bestModelName = mn
                 bestHM = modelHM
     
-    return {
+    ret = {
         'eval_recall' : bestModelTargetRecall,
         'model_name' : bestModelName,
         'hm_score' : bestHM
     }
+    if global_precision != None:
+        ret['base_precision'] = base_precision
+        ret['derived_recall'] = derived_recall
+    
+    return ret
 
 def evaluateVariants(args):
     '''

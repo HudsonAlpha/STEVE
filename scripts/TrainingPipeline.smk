@@ -219,7 +219,8 @@ rule SummarizeModels:
         images=directory("{pipeline_dir}/model_summaries/{reference}/{aligner}/{caller}/roc_curves")
     params:
         script=MODEL_REPORT_SCRIPT,
-        prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}"
+        prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}",
+        global_precision="0.9999"
     #conda:
     #    CONDA_ENV
     log: "{pipeline_dir}/logs/model_summaries/{reference}/{aligner}/{caller}.log"
@@ -228,6 +229,7 @@ rule SummarizeModels:
         '''
         python3 -u {params.script} \
             -r {output.images} \
+            -g {params.global_precision} \
             {params.prefix} > \
             {output.summary}
         '''
@@ -272,8 +274,7 @@ rule ModelEli5:
     shell:
         '''
         python3 -u {params.script} \
-            -m 0.99 \
-            -t 0.995 \
+            -g 0.9999 \
             {params.prefix} \
             {output.eli5}
         '''
