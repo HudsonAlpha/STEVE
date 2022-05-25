@@ -3,6 +3,7 @@ import os
 
 from RunTrainingPipeline import parseSlids
 from PipelineConfig import *
+from TrainingConfig import GLOBAL_AUTO_TARGET_PRECISION
 
 #derived from repo 
 PIPELINE_DIRECTORY = '%s/pipeline_pcrfree' % REPO_DIRECTORY
@@ -220,7 +221,7 @@ rule SummarizeModels:
     params:
         script=MODEL_REPORT_SCRIPT,
         prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}",
-        global_precision="0.9999"
+        global_precision=GLOBAL_AUTO_TARGET_PRECISION
     #conda:
     #    CONDA_ENV
     log: "{pipeline_dir}/logs/model_summaries/{reference}/{aligner}/{caller}.log"
@@ -266,6 +267,7 @@ rule ModelEli5:
         eli5="{pipeline_dir}/eli5_summaries/{reference}/{aligner}/{caller}/model_eli5.json"
     params:
         script=MODEL_ELI5_SCRIPT,
+        global_precision=GLOBAL_AUTO_TARGET_PRECISION,
         prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}"
     #conda:
     #    CONDA_ENV
@@ -274,7 +276,7 @@ rule ModelEli5:
     shell:
         '''
         python3 -u {params.script} \
-            -g 0.9999 \
+            -g {params.global_precision} \
             {params.prefix} \
             {output.eli5}
         '''

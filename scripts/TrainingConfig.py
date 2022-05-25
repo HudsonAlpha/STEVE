@@ -33,7 +33,7 @@ ENABLE_AUTO_TARGET = True
 #if auto-targets is enabled, this is the total target precision that is used for deriving the auto-target
 # e.g. if based precision is 0.999, then the model needs to recover 0.0009 of the 0.001 that is not captured
 # e.g. 90% derived target recall for the models
-GLOBAL_AUTO_TARGET_PRECISION = 0.9999
+GLOBAL_AUTO_TARGET_PRECISION = 0.99996
 AUTO_TARGET_BREAKPOINT_COUNT = 10 #the number of point inbetween the target and 1.00 to calculate, must be > 0
 AUTO_EXTRA_TARGETS = [0.9999, 1.0000] #these are always added
 

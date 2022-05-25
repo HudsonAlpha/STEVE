@@ -73,10 +73,10 @@ def printModelStats(modelType, stats):
         'eval_recall'
     ]
     for e in evalList:
-        header.append(e)
-        header.append('')
-        header.append('')
-        header.append('')
+        header.append(f'{e}-recall')
+        header.append('CV_recall')
+        header.append('FPR')
+        header.append('CV_FPR')
     print(*header, sep='\t')
     for targetRecall in availableRecalls:
         rowVals = ['%0.4f' % (float(targetRecall), )]
