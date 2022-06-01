@@ -73,7 +73,7 @@ FLIP_TP = True
 CLASSIFIERS = []
 
 #Generally slight underperformance, but is a decent backup
-ENABLE_RANDOMFOREST = False
+ENABLE_RANDOMFOREST = True
 
 #performs alright, but always seems to be below GradientBoostingClassifier and slower
 ENABLE_ADABOOST = False
@@ -114,7 +114,7 @@ if ENABLE_RANDOMFOREST:
             'random_state' : [0],
             'class_weight' : ['balanced'],
             'n_estimators' : [200], #prior tests: 100, 200, 300, 500 - technically 500 was best, but you really get marginal gains
-            'max_depth' : [6], #prior tests: 3, 4, 5
+            'max_depth' : [3, 6], #prior tests: 3, 4, 5
             'min_samples_split' : [2, 50],
             'max_features' : ['sqrt'],
             'bootstrap' : [True],
