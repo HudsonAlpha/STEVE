@@ -1,5 +1,6 @@
 
 import argparse as ap
+import cyvcf2
 import csv
 import json
 import numpy as np
@@ -8,6 +9,7 @@ import re
 #import vcf
 
 from ExtractFeatures import ALL_METRICS, getVariantFeatures, GT_TRANSLATE, VAR_TRANSLATE
+from TrainingConfig import ENABLE_AUTO_TARGET, GLOBAL_AUTO_TARGET_PRECISION
 
 def getClinicalModel(stats, acceptedRecall, targetRecall, global_precision):
     '''
@@ -166,7 +168,7 @@ def runSubType(variantType, args, stats, models, statKey):
 
     #make sure our recall is in the list
     availableRecalls = stats[list(stats.keys())[0]]['ALL_SUMMARY'].keys()
-    if targetRecall not in availableRecalls:
+    if targetRecall not in availableRecalls and not ENABLE_AUTO_TARGET:
         raise Exception('Invalid target recall, available options are: %s' % (availableRecalls, ))
 
     #figure out which models we will actually be using
@@ -191,17 +193,25 @@ def runSubType(variantType, args, stats, models, statKey):
         evalList = [bestModelName]
     
     elif modelName == 'clinical':
-        #TODO: make this a script parameter instead of hard-coding
-        #this contains minimum acceptable recals for a given target
-        targetThresholds = {
-            '0.995' : 0.99
-        }
-        if targetRecall not in targetThresholds:
-            raise Exception('"clinical" mode has no defined threshold for target recall "%s"' % targetRecall)
-        acceptedRecall = targetThresholds[targetRecall]
+        if ENABLE_AUTO_TARGET:
+            global_precision = GLOBAL_AUTO_TARGET_PRECISION
+            
+            #dummy values
+            acceptedRecall = 0.0
+            targetRecall = 0.0
+        else:
+            global_precision = None
+            #TODO: make this a script parameter instead of hard-coding
+            #this contains minimum acceptable recals for a given target
+            targetThresholds = {
+                '0.995' : 0.99
+            }
+            if targetRecall not in targetThresholds:
+                raise Exception('"clinical" mode has no defined threshold for target recall "%s"' % targetRecall)
+            acceptedRecall = targetThresholds[targetRecall]
         
         #get the clinical model
-        clinicalModelDict = getClinicalModel(stats, acceptedRecall, targetRecall)
+        clinicalModelDict = getClinicalModel(stats, acceptedRecall, targetRecall, global_precision)
         bestModelName = clinicalModelDict['model_name']
         bestModelTargetRecall = clinicalModelDict['eval_recall']
         
@@ -252,10 +262,11 @@ def runSubType(variantType, args, stats, models, statKey):
         allVariants += loadCodicemVariants(args.codicem)
     
     #now load the VCF file
-    vcfReader = vcf.Reader(filename=args.sample_vcf, compressed=True)
-    rawReader = vcf.Reader(filename=args.sample_vcf, compressed=True)
-    assert(len(vcfReader.samples) == 1)
-    chromList = vcfReader.contigs.keys()
+    vcf_reader = cyvcf2.VCF(args.sample_vcf)
+    raw_reader = cyvcf2.VCF(args.sample_vcf)
+    assert(len(vcf_reader.samples) == 1)
+    sample_index = 0
+    chrom_list = vcf_reader.seqnames
 
     #go through each variant and extract the features into a shared set
     varIndex = []
@@ -263,12 +274,12 @@ def runSubType(variantType, args, stats, models, statKey):
     rawGT = []
     varFeatures = []
     for i, (chrom, start, end, ref, alt) in enumerate(allVariants):
-        if (chrom not in chromList and
-            'chr'+chrom in chromList):
+        if (chrom not in chrom_list and
+            'chr'+chrom in chrom_list):
             chrom = 'chr'+chrom
         
-        if chrom in chromList:
-            variantList = [variant for variant in vcfReader.fetch(chrom, start, end)]
+        if chrom in chrom_list:
+            variantList = [variant for variant in vcf_reader(f'{chrom}:{start}-{end}')]
         else:
             print('WARNING: Chromosome "%s" not found' % (chrom, ))
             variantList = []
@@ -279,7 +290,7 @@ def runSubType(variantType, args, stats, models, statKey):
 
         #now go through each variant and pull out the features for it
         for variant in variantList:
-            featureVals = getVariantFeatures(variant, vcfReader.samples[0], fields, rawReader, allowHomRef=True)
+            featureVals = getVariantFeatures(variant, sample_index, fields, raw_reader, allowHomRef=True)
             varFeatures.append(featureVals)
             rawGT.append(featureVals[gtIndex])
     
@@ -322,7 +333,8 @@ def runSubType(variantType, args, stats, models, statKey):
             #if it's not found, we DON'T put it in the dictionary list
         else:
             for ind in foundVarIndices:
-                vals = [chrom, start, end, ref, alt, rawVariants[ind], rawGT[ind]]
+                raw_variant_str = generateCyvcf2RecordStr(rawVariants[ind])
+                vals = [chrom, start, end, ref, alt, raw_variant_str, rawGT[ind]]
                 modelResultDict = {}
                 resultsFound = False
                 for mn in evalList:
@@ -346,7 +358,7 @@ def runSubType(variantType, args, stats, models, statKey):
                         'end' : end,
                         'ref' : ref,
                         'alt' : alt,
-                        'call_variant' : rawVariants[ind],
+                        'call_variant' : raw_variant_str,
                         'call_gt' : rawGT[ind],
                         'predictions' : modelResultDict
                     }
@@ -386,10 +398,11 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
         allVariants += loadCodicemVariants(args.codicem)
     
     #now load the VCF file
-    vcfReader = vcf.Reader(filename=args.sample_vcf, compressed=True)
-    rawReader = vcf.Reader(filename=args.sample_vcf, compressed=True)
-    assert(len(vcfReader.samples) == 1)
-    chromList = vcfReader.contigs.keys()
+    vcf_reader = cyvcf2.VCF(args.sample_vcf)
+    raw_reader = cyvcf2.VCF(args.sample_vcf)
+    assert(len(vcf_reader.samples) == 1)
+    sample_index = 0
+    chrom_list = vcf_reader.seqnames
 
     #go through each variant and extract the features into a shared set
     varIndex = []
@@ -397,12 +410,12 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
     rawGT = []
     varFeatures = []
     for i, (chrom, start, end, ref, alt) in enumerate(allVariants):
-        if (chrom not in chromList and
-            'chr'+chrom in chromList):
+        if (chrom not in chrom_list and
+            'chr'+chrom in chrom_list):
             chrom = 'chr'+chrom
         
-        if chrom in chromList:
-            variantList = [variant for variant in vcfReader.fetch(chrom, start, end)]
+        if chrom in chrom_list:
+            variantList = [variant for variant in vcf_reader(f'{chrom}:{start}-{end}')]
         else:
             print('WARNING: Chromosome "%s" not found' % (chrom, ))
             variantList = []
@@ -413,7 +426,7 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
 
         #now go through each variant and pull out the features for it
         for variant in variantList:
-            featureVals = getVariantFeatures(variant, vcfReader.samples[0], fields, rawReader, allowHomRef=True)
+            featureVals = getVariantFeatures(variant, sample_index, fields, raw_reader, allowHomRef=True)
             varFeatures.append(featureVals)
             rawGT.append(featureVals[gtIndex])
     
@@ -436,7 +449,8 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
             valList.append(vals)
         else:
             for ind in foundVarIndices:
-                vals = [chrom, start, end, ref, alt, rawVariants[ind], rawGT[ind]]
+                raw_variant_str = generateCyvcf2RecordStr(rawVariants[ind])
+                vals = [chrom, start, end, ref, alt, raw_variant_str, rawGT[ind]]
                 modelResultDict = {}
                 resultsFound = False
                 if filtersEnabled and (acceptedVT != varFeatures[ind][0] or 
@@ -459,7 +473,7 @@ def runReferenceCalls(variantType, args, acceptedVT, acceptedGT):
                         'end' : end,
                         'ref' : ref,
                         'alt' : alt,
-                        'call_variant' : rawVariants[ind],
+                        'call_variant' : raw_variant_str,
                         'call_gt' : rawGT[ind],
                         'predictions' : modelResultDict
                     }
@@ -518,6 +532,18 @@ def parseCLIVariants(csVar):
         if (var not in ret):
             ret.append(var)
     return ret
+
+def generateCyvcf2RecordStr(variant):
+    '''
+    Simple cyvcf2 variant reformatter, makes it match something similar to vcf
+    @param variant - a variant from cyvcf2
+    @return - a string formatted as a "record"
+    '''
+    chrom = variant.CHROM
+    pos = variant.POS
+    ref = variant.REF
+    alts = variant.ALT
+    return f'cyvcf2.record(CHROM={chrom}, POS={pos}, REF={ref}, ALT={alts})'
 
 def loadCodicemVariants(csvFN):
     '''
