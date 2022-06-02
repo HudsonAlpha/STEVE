@@ -114,6 +114,8 @@ rule ExtractFeatures:
     params:
         script=EXTRACT_SCRIPT,
         prefix="{pipeline_dir}/features"
+    resources:
+        mem_mb=8192
     #conda:
     #    CONDA_ENV
     log: "{pipeline_dir}/logs/features/{reference}/{aligner}/{caller}/{slid}.log"
