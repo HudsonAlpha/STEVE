@@ -36,7 +36,6 @@ dependencies:
     - coloredlogs==15.0.1
     - configargparse==1.5.3
     - connection-pool==0.0.3
-    - csl-pipeline-config==1.0.9
     - cycler==0.11.0
     - cyvcf2==0.30.15
     - datrie==0.8.2
