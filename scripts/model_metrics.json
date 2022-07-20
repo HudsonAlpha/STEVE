@@ -39,13 +39,16 @@
                 "AFO", "GT", "DP", "GQ", "min(PL)"
             ],
             "INFO" : [
-                "BaseQRankSum", "ClippingRankSum", "DP", "Entropy", "ExcessHet", 
+                "BaseQRankSum", "ClippingRankSum", "DP", "Entropy", "ExcessHet",
                 "FS", "GC", "ML_PROB", "MQ", "MQ0",
                 "MQRankSum", "NBQ", "QD", "ReadPosEndDist", "ReadPosRankSum", 
                 "SOR", "STR", "UDP"
             ],
             "MUNGED" : [
                 "DP_DP", "FILTER", "ID", "NEARBY", "QUAL"
+            ],
+            "IGNORE" : [
+                
             ]
         }
     },

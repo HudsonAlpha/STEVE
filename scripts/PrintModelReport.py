@@ -173,6 +173,7 @@ def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels, globa
             print(*rowVals, sep='\t')
         else:
             bestModelTargetRecall = clinDict['eval_recall']
+            str_bestModelTargetRecall = '{0:0.4f}'.format(float(bestModelTargetRecall))
 
             #copy TPR results
             bestTPR = stats[bestModelName]['ALL_SUMMARY'][bestModelTargetRecall]['TEST_TPR'][0]
@@ -185,7 +186,7 @@ def printClinicalModels(allStats, acceptedRecall, targetRecall, allModels, globa
             bestFPR = stats[bestModelName]['ALL_SUMMARY'][bestModelTargetRecall]['TEST_FPR'][0]
 
             rowVals = [
-                reformKey, bestModelName, bestModelTargetRecall,
+                reformKey, bestModelName, str_bestModelTargetRecall,
                 '%0.4f+-%0.4f' % (bestTPRAvg, bestTPRStd), 
                 '%0.4f' % bestTPR,
                 '%0.4f+-%0.4f' % (bestFPRAvg, bestFPRStd), 

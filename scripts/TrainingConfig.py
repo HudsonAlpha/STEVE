@@ -34,7 +34,7 @@ ENABLE_AUTO_TARGET = True
 # e.g. if based precision is 0.999, then the model needs to recover 0.0009 of the 0.001 that is not captured
 # e.g. 90% derived target recall for the models
 GLOBAL_AUTO_TARGET_PRECISION = 0.99996
-AUTO_TARGET_BREAKPOINT_COUNT = 10 #the number of point inbetween the target and 1.00 to calculate, must be > 0
+AUTO_TARGET_BREAKPOINT_COUNT = 20 #the number of point inbetween the target and 1.00 to calculate, must be > 0
 AUTO_EXTRA_TARGETS = [0.9999, 1.0000] #these are always added
 
 #if the auto-targets is disabled, these will be used as targets instead
@@ -49,7 +49,7 @@ MANUAL_FS_LABELS = ['CALL-ADO', 'CALL-AFO']
 #if True, this will pre-pend an automated feature selection step to each pipeline
 #WARNING: this can be a time-consuming process, the reduce run-time increase FS_STEP_SIZE and/or FS_MIN_FEATURE_COUNT
 ENABLE_FEATURE_SELECTION = True
-FS_MIN_FEATURE_COUNT = 10 #always keep at least this many features
+FS_MIN_FEATURE_COUNT = 20 #always keep at least this many features
 FS_STEP_SIZE = 0.1 #if an int, the number of features to remove at each step; if a float, the fraction of features to remove at each step
 FEATURE_SELECTION_MODELS = [
     RFECV(
