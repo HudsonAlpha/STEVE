@@ -574,7 +574,7 @@ if __name__ == "__main__":
     #optional arguments with default
     p.add_argument('-c', '--codicem', dest='codicem', default=None, help='a Codicem CSV file with variants to evaluate (default: None)')
     p.add_argument('-v', '--variants', dest='variants', default=None, help='variant coordinates to evaluate (default: None)')
-    p.add_argument('-m', '--model', dest='model', default='best', help='the model name to use (default: best)')
+    p.add_argument('-m', '--model', dest='model', default='clinical', help='the model name to use (default: clinical)')
     p.add_argument('-r', '--recall', dest='recall', default='0.99', help='the target recall value from training (default: 0.99)')
     p.add_argument('-o', '--output', dest='outFN', default=None, help='the place to send output to (default: stdout)')
 
