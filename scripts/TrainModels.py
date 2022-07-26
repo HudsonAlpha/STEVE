@@ -15,6 +15,7 @@ from sklearn.metrics import roc_curve
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import LeaveOneGroupOut
 from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
 from sklearn.svm import SVC
 from sklearn.utils import shuffle
 from skopt import BayesSearchCV
@@ -56,6 +57,7 @@ def trainModels(featureDir, slids, outPrefix, splitByType, numProcs):
     fieldsList = json.load(fp)
     fp.close()
     
+    print(f'[{datetime.datetime.now()}] Full sample list: {samples}')
     #get data from each sample
     for sample in samples:
         #TP first
@@ -77,7 +79,7 @@ def trainModels(featureDir, slids, outPrefix, splitByType, numProcs):
         assert(fpFields == fieldsList)
         fpVar = np.load(fpFN, 'r')
         fpList.append(fpVar)
-        
+
     results = {}
     trainedModelDict = {}
     rocDict = {}
@@ -120,7 +122,7 @@ def trainModels(featureDir, slids, outPrefix, splitByType, numProcs):
     fp = open(rocFN, 'w+')
     json.dump(rocDict, fp, indent=4, sort_keys=True)
     fp.close()
-
+    
     print('[%s] All models finished training!' % (str(datetime.datetime.now()), ))
 
 def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, callType, numProcs):
@@ -173,6 +175,10 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
     train_groups = []
     test_list_X = []
     test_list_Y = []
+    
+    #we will need the totals if we auto-calculate the target recalls
+    raw_total_tp = 0
+    raw_total_fp = 0
 
     for i in range(0, len(raw_tpList)):
         tpVals = raw_tpList[i]
@@ -192,6 +198,10 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
             tpVals = np.delete(tpVals, removedIndices, 1)
             fpVals = np.delete(fpVals, removedIndices, 1)
         
+        #store the total number we found before any sort of subsetting; this is used to derive overall accuracies if auto-enabled
+        raw_total_tp += tpVals.shape[0]
+        raw_total_fp += fpVals.shape[0]
+
         #we aren't doing a full test, so cut the input sizes down
         if USE_SUBSET:
             tpVals = tpVals[:SUBSET_SIZE]
@@ -241,6 +251,34 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
 
     #TODO: future possible optimization - RandomForest and EasyEnsemble have a "n_jobs" parameters for parallel 
     # fit/predict; is there a way we can utilize that in general?
+
+    print('Raw Total TP, FP:', raw_total_tp, raw_total_fp)
+    total_obs = raw_total_fp + raw_total_tp
+    raw_precision = raw_total_tp / total_obs
+    print('Raw precision:', raw_precision)
+
+    if ENABLE_AUTO_TARGET:
+        #we need to derive what the recall targets should be
+        missed_precision = GLOBAL_AUTO_TARGET_PRECISION - raw_precision
+
+        if missed_precision < 0:
+            #TODO: what should we do here generally? this isn't currently an issue
+            raise Exception('raw precision is already better than global target, this is currently unhandled')
+        
+        total_gap = 1.0 - raw_precision
+        lower_target_recall = missed_precision / total_gap
+        delta_gap = (1.0 - lower_target_recall) / AUTO_TARGET_BREAKPOINT_COUNT
+        
+        auto_targets = [lower_target_recall + i*delta_gap for i in range(0, AUTO_TARGET_BREAKPOINT_COUNT)]
+        auto_targets += [0.9999, 1.0000]
+
+        #now reverse sort them
+        recall_targets = np.array(sorted(auto_targets)[::-1])
+
+    else:
+        #manual targetting only
+        recall_targets = MANUAL_TARGETS
+    print('Recall targets: ', recall_targets)
     
     #go through each model, one at a time
     for (label, raw_clf, hyperparameters, rangeHyperparams) in CLASSIFIERS:
@@ -251,20 +289,50 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
             passParams = rangeHyperparams
         else:
             passParams = hyperparameters
-        fullClf, sumRet, sumRocRet = trainClassifier(raw_clf, passParams, final_train_X, final_train_Y, final_train_groups, configuration)
+
+        if ENABLE_FEATURE_SELECTION:
+            pipeline_clf = Pipeline(
+                [
+                    #this is a relatively small and relatively shallow GBC
+                    ("reduce_dim", 'passthrough'),
+                    #now the main classifier
+                    ("classifier", raw_clf)
+                ]
+            )
+            new_params = {
+                'reduce_dim' : FEATURE_SELECTION_MODELS
+            }
+            for k in passParams.keys():
+                new_key = f'classifier__{k}'
+                new_params[new_key] = passParams[k]
+            passParams = new_params
+        else:
+            pipeline_clf = raw_clf 
+
+        fullClf, sumRet, sumRocRet = trainClassifier(
+            pipeline_clf, passParams, final_train_X, final_train_Y, final_train_groups, 
+            configuration, recall_targets, raw_precision
+        )
 
         if label == 'GradientBoosting':
-            print('n_estimators_', fullClf.n_estimators_)
+            if ENABLE_FEATURE_SELECTION:
+                print('n_estimators_', fullClf[1].n_estimators_)
+            else:
+                print('n_estimators_', fullClf.n_estimators_)
+        if ENABLE_FEATURE_SELECTION:
+            print('support_', fullClf[0].support_)
         #this is the test on the held out test set
         print('[%s]\tFull testing classifier...' % (str(datetime.datetime.now()), ))
         resultsDict = testClassifier(fullClf, final_train_X, final_train_Y, final_test_X, final_test_Y)
         
         #get results and store everything in the dictionary locations below
-        allRet, allRocRet = summarizeResults([resultsDict], [final_test_Y])
+        allRet, allRocRet = summarizeResults([resultsDict], [final_test_Y], recall_targets, raw_precision)
 
         ret[label] = {
             'LEAVEONEOUT_SUMMARY' : sumRet,
-            'ALL_SUMMARY' : allRet
+            'ALL_SUMMARY' : allRet,
+            'RAW_TOTAL_TP' : raw_total_tp,
+            'RAW_TOTAL_FP' : raw_total_fp
         }
         modelRet[label] = {
             'FEATURES' : featureLabels,
@@ -280,7 +348,7 @@ def trainAllClassifiers(raw_tpList, raw_fpList, raw_featureLabels, variantType, 
     
     return ret, modelRet, rocRet
 
-def trainClassifier(raw_clf, hyperparameters, train_X, train_Y, train_groups, configuration):
+def trainClassifier(raw_clf, hyperparameters, train_X, train_Y, train_groups, configuration, recall_targets, base_precision):
     '''
     This will run a classifier for us
     @param raw_clf - a classifier instance
@@ -289,6 +357,8 @@ def trainClassifier(raw_clf, hyperparameters, train_X, train_Y, train_groups, co
     @param train_Y - the classifier values expected
     @param train_groups - the groups of input values
     @param configuration - a dictionary containing information on how to do the training
+    @param recall_targets - the recall targets to evaluate results
+    @param raw_precision - the base precision prior to any training
     @return - a trained classifier
     '''
     print('[%s]\tFull training classifier...' % (str(datetime.datetime.now()), ))
@@ -319,7 +389,7 @@ def trainClassifier(raw_clf, hyperparameters, train_X, train_Y, train_groups, co
             )
         else:
             raise Exception('NO_IMPL')
-        gsClf.fit(train_X, train_Y, train_groups)
+        gsClf.fit(train_X, train_Y, groups=train_groups)
         print('[%s]\t\tBest params: %s' % (str(datetime.datetime.now()), gsClf.best_params_))
         
         print('[%s]\tGathering CV results...'% (str(datetime.datetime.now()), ))
@@ -332,7 +402,7 @@ def trainClassifier(raw_clf, hyperparameters, train_X, train_Y, train_groups, co
             test_Ys.append(train_Y[test_ind])
 
         print('[%s]\tGenerating CV summary...'% (str(datetime.datetime.now()), ))
-        sumRet, sumRocRet = summarizeResults(results, test_Ys)
+        sumRet, sumRocRet = summarizeResults(results, test_Ys, recall_targets, base_precision)
     else:
         raise Exception('Unexpected mode')
     
@@ -353,6 +423,11 @@ def testClassifier(clf, train_X, train_Y, test_X, test_Y):
     @param test_X - the training features
     @param test_Y - the classifier values expected
     @return - a dictionary of many results
+        TEST_PRED - the probability of being in class 1 (i.e. predicted false call) on the test data
+        TEST_ROC - tuple (false_positive rate, true_positive_rate, thresholds) from the roc_curve function on the test data
+        TEST_ROC_AUC - ROC-AUC from auc(roc_curve(...))
+        TRAIN_PRED - the probability of being class 1 on the training data
+        TRAIN_ROC - tuple (false_positive rate, true_positive_rate, thresholds) from the roc_curve function on the training data
     '''
     ret = {}
     
@@ -373,15 +448,18 @@ def testClassifier(clf, train_X, train_Y, test_X, test_Y):
 
     return ret
 
-def summarizeResults(results, test_Ys):
+def summarizeResults(results, test_Ys, recallValues, base_precision):
     '''
     This will summarize results for us across multiple leave-one-out runs
-    @param results - a list of results dictionaries for a classifier
-    @return - TODO
+    @param results - a list of results dictionaries for a classifier; this is basically a list of results from testClassifier(...)
+    @param test_Ys - a list of lists of correct Y-values (e.g. categories)
+    @param recallValues - the recall values to evaluate the models at
+    @param base_precision - the base precision of the caller without any ML
+    @return - tuple (stats, rocs)
+        stats - a dict where key is a recall value and value is a dictionary of stats for the model with that recall including test/train TPR, FPR, etc.
+        rocs - a list of test ROCs, one for each in results
     '''
     print('[%s]\tRunning threshold tests...' % (str(datetime.datetime.now()), ))
-    recallValues = np.array([1.0, 0.9999, 0.999, 0.998, 0.997, 0.996, 0.995, 0.99])
-    
     #TODO: if we want to do confidence intervals on errors, look into it here: (For now, I think CV is fine)
     #https://machinelearningmastery.com/report-classifier-performance-confidence-intervals/
     #note for future matt, if you get 0 errors out of N classifications, we would need to assume the NEXT
@@ -392,8 +470,13 @@ def summarizeResults(results, test_Ys):
     # 99% confidence in that interval
     
     ret = {}
-    print('', 'tarTPR', 'train_FPR', 'train_TPR', 'test_FPR', 'test_TPR', 'adjConf', sep='\t')
+    if ENABLE_AUTO_TARGET:
+        print('', 'tarTPR', 'train_FPR', 'train_TPR', 'test_FPR', 'test_TPR', 'global_prec', 'adjConf', sep='\t')
+    else:
+        print('', 'tarTPR', 'train_FPR', 'train_TPR', 'test_FPR', 'test_TPR', 'adjConf', sep='\t')
     for minRecall in recallValues:
+        #for each specified recall level, we want to calculate how well the training/testing does for a bunch of stats:
+        #   training FPR, training TPR, training thresholds, testing FPR, testing TPR, and testing confusion matrix (CM)
         tarTPR = minRecall
         trainFprList = []
         trainTprList = []
@@ -402,12 +485,16 @@ def summarizeResults(results, test_Ys):
         testCMList = []
         testFprList = []
         testTprList = []
-        
+
+        #for CV, we will have multiple training/testing sets, so we need to gather them all for mean/std later
+        #this function is also used for final training, which will only have one set in `results` (i.e. N=1, st. dev.=0)
         for i, resultsDict in enumerate(results):
+            #get the training ROC values
             train_false_positive_rate, train_true_positive_rate, train_thresholds = resultsDict['TRAIN_ROC']
             test_Y = test_Ys[i]
 
             #first, find the point in the training values that matches our recall requirement
+            #this will allow us to pick the threshold value matching that recall req.
             ind = bisect.bisect_left(train_true_positive_rate, minRecall)
             while train_true_positive_rate[ind] < minRecall:
                 ind += 1
@@ -435,11 +522,19 @@ def summarizeResults(results, test_Ys):
             ('%0.4f+-%0.4f', (np.mean(trainFprList), np.std(trainFprList))),
             ('%0.4f+-%0.4f', (np.mean(trainTprList), np.std(trainTprList))),
             ('%0.4f+-%0.4f', (np.mean(testFprList), np.std(testFprList))),
-            ('%0.4f+-%0.4f', (np.mean(testTprList), np.std(testTprList))),
+            ('%0.4f+-%0.4f', (np.mean(testTprList), np.std(testTprList)))
+        ]
+        if ENABLE_AUTO_TARGET:
+            recall = np.mean(testTprList)
+            printVals += [
+                ('%0.6f', base_precision + (1-base_precision) * recall)
+            ]
+        printVals += [
             ('%s', str(sum(testCMList)).replace('\n', '')),    
         ]
         print('\t'.join([t[0] % t[1] for t in printVals]))
 
+        #save the lists in our output tied to this recall value
         ret[minRecall] = {
             'TRAIN_FPR' : trainFprList,
             'TRAIN_TPR' : trainTprList,

@@ -32,6 +32,24 @@
             "MUNGED" : [
                 "QUAL", "NEARBY", "FILTER", "ID"
             ]
+        },
+        "dnascope-1.0-202112.01-PO" : {
+            "CALL" : [
+                "AD0", "AD1", "ADO", "AF0", "AF1", 
+                "AFO", "GT", "DP", "GQ", "min(PL)"
+            ],
+            "INFO" : [
+                "BaseQRankSum", "ClippingRankSum", "DP", "Entropy", "ExcessHet",
+                "FS", "GC", "ML_PROB", "MQ", "MQ0",
+                "MQRankSum", "NBQ", "QD", "ReadPosEndDist", "ReadPosRankSum", 
+                "SOR", "STR", "UDP"
+            ],
+            "MUNGED" : [
+                "DP_DP", "FILTER", "ID", "NEARBY", "QUAL"
+            ],
+            "IGNORE" : [
+                
+            ]
         }
     },
     "copied" : {

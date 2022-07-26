@@ -3,6 +3,7 @@ import os
 
 from RunTrainingPipeline import parseSlids
 from PipelineConfig import *
+from TrainingConfig import GLOBAL_AUTO_TARGET_PRECISION
 
 #derived from repo 
 PIPELINE_DIRECTORY = '%s/pipeline_pcrfree' % REPO_DIRECTORY
@@ -113,6 +114,8 @@ rule ExtractFeatures:
     params:
         script=EXTRACT_SCRIPT,
         prefix="{pipeline_dir}/features"
+    resources:
+        mem_mb=8192
     #conda:
     #    CONDA_ENV
     log: "{pipeline_dir}/logs/features/{reference}/{aligner}/{caller}/{slid}.log"
@@ -219,7 +222,8 @@ rule SummarizeModels:
         images=directory("{pipeline_dir}/model_summaries/{reference}/{aligner}/{caller}/roc_curves")
     params:
         script=MODEL_REPORT_SCRIPT,
-        prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}"
+        prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}",
+        global_precision=GLOBAL_AUTO_TARGET_PRECISION
     #conda:
     #    CONDA_ENV
     log: "{pipeline_dir}/logs/model_summaries/{reference}/{aligner}/{caller}.log"
@@ -228,6 +232,7 @@ rule SummarizeModels:
         '''
         python3 -u {params.script} \
             -r {output.images} \
+            -g {params.global_precision} \
             {params.prefix} > \
             {output.summary}
         '''
@@ -264,6 +269,7 @@ rule ModelEli5:
         eli5="{pipeline_dir}/eli5_summaries/{reference}/{aligner}/{caller}/model_eli5.json"
     params:
         script=MODEL_ELI5_SCRIPT,
+        global_precision=GLOBAL_AUTO_TARGET_PRECISION,
         prefix="{pipeline_dir}/trained_models/{reference}/{aligner}/{caller}"
     #conda:
     #    CONDA_ENV
@@ -272,8 +278,7 @@ rule ModelEli5:
     shell:
         '''
         python3 -u {params.script} \
-            -m 0.99 \
-            -t 0.995 \
+            -g {params.global_precision} \
             {params.prefix} \
             {output.eli5}
         '''

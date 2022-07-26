@@ -8,13 +8,14 @@ import pickle
 from EvaluateVariants import getClinicalModel
 from ExtractFeatures import GT_TRANSLATE, VAR_TRANSLATE
 
-def gatherEli5Stats(modelDir, minRecall, targetRecall):
+def gatherEli5Stats(modelDir, minRecall, targetRecall, global_precision):
     '''
     This will gather our clinical model statistics in an ingestible format
     @param modelDir - the model directory 
     @param rocDir - a directory for output ROC curve images
     @param minRecall - the minimum recall values allowed
     @param targetRecall - the target recall we want the models to achieve
+    @param global_precision - if set, this will override other recall values
     '''
     #read in the stats
     jsonFN = '%s/stats.json' % (modelDir, )
@@ -29,14 +30,15 @@ def gatherEli5Stats(modelDir, minRecall, targetRecall):
     fp.close()
     
     #get the stats now and send 'em on back
-    return gatherClinicalModelStats(stats, minRecall, targetRecall, models)
+    return gatherClinicalModelStats(stats, minRecall, targetRecall, global_precision, models)
 
-def gatherClinicalModelStats(allStats, acceptedRecall, targetRecall, allModels):
+def gatherClinicalModelStats(allStats, acceptedRecall, targetRecall, global_precision, allModels):
     '''
     This will run eli5 if it can and store the results in a dictionary
     @param allStats - the full stats dict (all models)
     @param acceptedRecall - the minimum recall we need
     @param targetRecall - the target recall we want
+    @param global_precision - if set, this will override the recall values
     @param allModels - the actual loaded models
     @return - a dictionary where keys are the variant/genotype and value has the model name and eli5 outputs
     '''
@@ -46,7 +48,7 @@ def gatherClinicalModelStats(allStats, acceptedRecall, targetRecall, allModels):
         reformKey = VAR_TRANSLATE[int(k.split('_')[0])]+'_'+GT_TRANSLATE[int(k.split('_')[1])]
         
         #get the clinical model
-        clinicalModelDict = getClinicalModel(stats, acceptedRecall, targetRecall)
+        clinicalModelDict = getClinicalModel(stats, acceptedRecall, targetRecall, global_precision)
         bestModelName = clinicalModelDict['model_name']
         
         if bestModelName == None:
@@ -60,7 +62,7 @@ def gatherClinicalModelStats(allStats, acceptedRecall, targetRecall, allModels):
             coreFeatureNames = [tuple(f.split('-')) for f in allModels[k][bestModelName]['FEATURES']]
             
             #get the weights and add it to the result
-            weights = eli5.explain_weights(clf, feature_names=['-'.join(cfn) for cfn in coreFeatureNames])
+            weights = eli5.explain_weights(clf, feature_names=['-'.join(cfn) for cfn in coreFeatureNames], top=None)
             dictForm = eli5.formatters.as_dict.format_as_dict(weights)
             ret[reformKey] = {
                 'best_model' : bestModelName,
@@ -77,6 +79,7 @@ if __name__ == "__main__":
     #optional arguments with default
     p.add_argument('-m', '--min-recall', dest='min_recall', default=0.99, type=float, help='the minimum recall for clinical applications (default: 0.990)')
     p.add_argument('-t', '--target-recall', dest='target_recall', default=0.995, type=float, help='the target recall for clinical applications (default: 0.995)')
+    p.add_argument('-g', '--global-precision', dest='global_precision', default=None, type=float, help='the global precision target; if set, override min/target recalls (default: None)')
 
     #required main arguments
     p.add_argument('model_directory', type=str, help='directory with models and model stats')
@@ -86,7 +89,7 @@ if __name__ == "__main__":
     args = p.parse_args()
 
     #gather the stats
-    finalStats = gatherEli5Stats(args.model_directory, args.min_recall, args.target_recall)
+    finalStats = gatherEli5Stats(args.model_directory, args.min_recall, args.target_recall, args.global_precision)
 
     fp = open(args.out_json, 'w+')
     json.dump(finalStats, fp, indent=4, sort_keys=True)

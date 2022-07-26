@@ -39,7 +39,12 @@ We have currently configured the pipeline to run using an LSF cluster.  If a dif
 2. If running locally, configuration changes to the snakemake command itself may be necessary. These are located in variable `snakemakeFrags`, contact the repo owner or submit a ticket for assistance.
 
 ### Training Configuration (Optional)
-There are several options available that adjust way training of models is performed (e.g. models used, hyperparameters, training method, etc.).  These options are available in `TrainingConfig.py`.  Details on each will be in a future release. 
+There are several options available that adjust way training of models is performed (e.g. models used, hyperparameters, training method, etc.).
+These options are available in `TrainingConfig.py` and generally described in-line with the parameter.
+However, some are of critical importance and should be considered for training:
+
+1. `ENABLE_AUTO_TARGET` - If set to `True`, this option enables an alternate method for determining the target recall that is automatically calculated based on the observed precision and the desired global precision (another parameter `GLOBAL_AUTO_TARGET_PRECISION`). *Global precision* in this context is the combined precision of the upstream pipeline followed by STEVE identifying false positive calls from that pipeline.  For example, if the desired global precision is 99% and the upstream pipeline achieves 98% precision by itself, then the models trained by STEVE need to capture 1% out of the 2% false positives to achieve 99% global precision. This means the target recall will be set to 0.5000 indicating that half of all false positives need to be identified to achieve the desired global precision. This approach allows for pipeline that _already_ have a high precision to have lower/easier targets in STEVE to achieve the same global precision. In practice, this allows you to swap the upstream pipelines without needing to recalculate/adjust the target/accepted recall values to account for a more or less precise upstream pipeline.
+2. `ENABLE_FEATURE_SELECTION` - If set to `True`, this option enabled feature selection prior to model training. Numerous parameters adjust how exactly the feature selection is performed. In general, enabling feature selection leads to longer training times, but may improve the results by removing unnecessary and/or redundant features using a systematic approach.
 
 ### Setting up conda environment
 Assuming conda or miniconda is installed, use the following two commands to create and then activate a conda environment for the pipeline:
@@ -53,7 +58,7 @@ conda activate steve
 Assuming the above configuration steps were successful, all that remains is to run the pipeline itself.  Here is an example execution of the pipeline used in the paper:
 
 ```
-python3 scripts/RunTrainingPipeline.py -dest -x ./GIAB_v1.json
+python3 scripts/RunTrainingPipeline.py -dest -x ./sample_metadata/GIAB_v1.json
 ```
 
 For details on each option, run `python3 scripts/RunTrainingPipeline.py -h`.  The following sections describe what the pipeline is actually doing.

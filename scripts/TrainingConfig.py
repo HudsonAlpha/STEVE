@@ -1,8 +1,11 @@
 
 from imblearn.ensemble import EasyEnsembleClassifier
+import numpy as np
 from sklearn.ensemble import AdaBoostClassifier
 from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_selection import RFECV
 from sklearn.tree import DecisionTreeClassifier
 from skopt.space import Real, Categorical, Integer
 from xgboost import XGBClassifier
@@ -22,11 +25,45 @@ TEST_FRACTION = 0.5
 
 #if True, only use SUBSET_SIZE variants from each file (mostly for debugging)
 USE_SUBSET = False
-SUBSET_SIZE = 10000
+SUBSET_SIZE = 100000
+
+#if True, we will generate an array of targets from the data
+ENABLE_AUTO_TARGET = True
+
+#if auto-targets is enabled, this is the total target precision that is used for deriving the auto-target
+# e.g. if based precision is 0.999, then the model needs to recover 0.0009 of the 0.001 that is not captured
+# e.g. 90% derived target recall for the models
+GLOBAL_AUTO_TARGET_PRECISION = 0.99996
+AUTO_TARGET_BREAKPOINT_COUNT = 20 #the number of point inbetween the target and 1.00 to calculate, must be > 0
+AUTO_EXTRA_TARGETS = [0.9999, 1.0000] #these are always added
+
+#if the auto-targets is disabled, these will be used as targets instead
+MANUAL_TARGETS = np.array([
+    1.0, 0.9999, 0.999, 0.998, 0.997, 0.996, 0.995, 0.99
+])
 
 #if True, manually remove features in MANUAL_FS_LABELS (these are historically unimportant features)
-MANUAL_FS = True
+MANUAL_FS = False
 MANUAL_FS_LABELS = ['CALL-ADO', 'CALL-AFO']
+
+#if True, this will pre-pend an automated feature selection step to each pipeline
+#WARNING: this can be a time-consuming process, the reduce run-time increase FS_STEP_SIZE and/or FS_MIN_FEATURE_COUNT
+ENABLE_FEATURE_SELECTION = True
+FS_MIN_FEATURE_COUNT = 20 #always keep at least this many features
+FS_STEP_SIZE = 0.1 #if an int, the number of features to remove at each step; if a float, the fraction of features to remove at each step
+FEATURE_SELECTION_MODELS = [
+    RFECV(
+        #this is a relatively fast estimator; low tree count, shallow trees, and small sub-sample
+        estimator=GradientBoostingClassifier(
+            random_state=0, loss='exponential', n_estimators=50, max_depth=3, max_features='sqrt',
+            subsample=0.25
+        ), 
+        scoring='roc_auc',
+        step=FS_STEP_SIZE,
+        min_features_to_select=FS_MIN_FEATURE_COUNT,
+        cv=5
+    )
+]
 
 #if True, mark false positive as true positives and vice versa
 FLIP_TP = True
@@ -54,13 +91,6 @@ ENABLE_EASYENSEMBLE = False
 
 #this is an experimental mode in sklearn, it may change rapidly from version to version
 ENABLE_HISTGRADIENTBOOST = False
-if ENABLE_HISTGRADIENTBOOST:
-    #make sure we can actually do what we're trying to do
-    try:
-        from sklearn.experimental import enable_hist_gradient_boosting
-        from sklearn.ensemble import HistGradientBoostingClassifier
-    except:
-        ENABLE_HISTGRADIENTBOOST = False
 
 #here is where we put what each enable option indicates
 #now enumerate the models as a tuple (
@@ -83,11 +113,12 @@ if ENABLE_RANDOMFOREST:
         {
             'random_state' : [0],
             'class_weight' : ['balanced'],
-            'n_estimators' : [500], #prior tests: 100, 200, 300
-            'max_depth' : [6], #prior tests: 3, 4, 5
+            'n_estimators' : [200], #prior tests: 100, 200, 300, 500 - technically 500 was best, but you really get marginal gains
+            'max_depth' : [3, 6], #prior tests: 3, 4, 5
             'min_samples_split' : [2, 50],
             'max_features' : ['sqrt'],
-            'bootstrap' : [True, False]
+            'bootstrap' : [True],
+            'max_samples' : [0.25, 0.5]
         },
         {
             'random_state' : Categorical([0]),
@@ -117,10 +148,10 @@ if ENABLE_RANDOMFOREST:
     #'''
 
 if ENABLE_ADABOOST:
+    '''
+    Generally slower and worse results than other models, disabled after v1.
+    '''
     CLASSIFIERS.append(
-        '''
-        Generally slower and worse results than other models, disabled after v1.
-        '''
         #"The most important parameters are base_estimator, n_estimators, and learning_rate" - https://chrisalbon.com/machine_learning/trees_and_forests/adaboost_classifier/
         ('AdaBoost', AdaBoostClassifier(random_state=0, algorithm='SAMME.R', learning_rate=1.0, base_estimator=DecisionTreeClassifier(max_depth=2), n_estimators=200),
         {
@@ -158,8 +189,8 @@ if ENABLE_GRADIENTBOOST:
         {
             'random_state' : [0],
             'n_estimators' : [1000], #prior tests: 100, 200; OBSOLETE: since adding n_iter_no_change, just set to a big number
-            'max_depth' : [6], #prior tests: 3, 4
-            'learning_rate' : [0.05, 0.1, 0.5], #prior tests: 0.01, 0.2; from bayes mode, all results were in the 0.04-0.2 range with the occasional "high" rate near 0.5
+            'max_depth' : [3, 6], #prior tests: 3, 4
+            'learning_rate' : [0.05, 0.1, 0.2], #prior tests: 0.01, 0.2; from bayes mode, all results were in the 0.04-0.2 range with the occasional "high" rate near 0.5 - this was very rare though
             'loss' : ['exponential'], #prior tests: 'deviance'
             'max_features' : ['sqrt'],
             'min_samples_split' : [2, 15, 50], #mostly extremes in Bayes most, but adding 15 for middle-ground that was sometimes chosen
@@ -259,8 +290,8 @@ if ENABLE_HISTGRADIENTBOOST:
             'random_state' : [0],
             'learning_rate' : [0.05, 0.1], #high learning rates don't seem to work out very well
             'max_iter' : [1000],
-            'max_leaf_nodes' : [31], #don't want to make this too high or it overfits
-            'min_samples_leaf' : [200, 2000], #want this to be semi-high to avoid overfitting to a few variants
+            'max_leaf_nodes' : [15, 31], #don't want to make this too high or it overfits
+            'min_samples_leaf' : [20, 200], #want this to be semi-high to avoid overfitting to a few variants
             'validation_fraction' : [0.1],
             'n_iter_no_change' : [20]
         },
