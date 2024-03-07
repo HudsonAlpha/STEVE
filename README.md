@@ -104,7 +104,7 @@ python3 EvaluateVariants.py \
 5. `[vcf_filename]` - the raw VCF file, make sure it is the same format as the selected model
 
 ## License
-For non-commerical use, STEVE is released under the Apache-2.0 License. For commercial use, please contact [jholt@hudsonalpha.org](jholt@hudsonalpha.org).
+For non-commerical use, STEVE is released under the Apache-2.0 License. For commercial use, please contact [snewberry@hudsonalpha.org](mailto:snewberry@hudsonalpha.org).
 
 ## References
 Published paper:
